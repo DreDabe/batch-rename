@@ -1,11 +1,20 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow } from 'electron'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { registerIpcHandlers } from './ipc/index'
+import { configService } from './services/config'
+import { logService } from './services/logger'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL']
+
+async function initialize() {
+  await logService.initialize()
+  await configService.load()
+  registerIpcHandlers()
+}
 
 function createWindow() {
   const mainWindow = new BrowserWindow({
@@ -16,10 +25,10 @@ function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
     },
     title: '批量重命名工具',
-    show: false
+    show: false,
   })
 
   mainWindow.once('ready-to-show', () => {
@@ -34,7 +43,8 @@ function createWindow() {
   }
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  await initialize()
   createWindow()
 
   app.on('activate', () => {
@@ -49,5 +59,3 @@ app.on('window-all-closed', () => {
     app.quit()
   }
 })
-
-ipcMain.handle('ping', () => 'pong')
