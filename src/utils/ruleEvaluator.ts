@@ -51,7 +51,7 @@ function evaluateExpression(
       return getFileNameWithoutExtension(file.name)
 
     case 'extension':
-      return file.extension || ''
+      return file.extension ? '.' + file.extension : ''
 
     case 'date':
       return formatDate(new Date(), expr.format)
@@ -76,13 +76,17 @@ function formatNumber(index: number, expr: Expression): string {
 function parseDigits(format?: string): number {
   if (!format) return 1
 
-  const match = format.match(/^0*(\d+)$/)
-  if (match) {
-    return parseInt(match[1], 10)
+  const zeroMatch = format.match(/^(0+)$/)
+  if (zeroMatch) {
+    return zeroMatch[1].length
   }
 
-  const digitsMatch = format.match(/^(0+)$/)
-  return digitsMatch ? digitsMatch[1].length : 1
+  const numMatch = format.match(/^(\d+)$/)
+  if (numMatch) {
+    return parseInt(numMatch[1], 10)
+  }
+
+  return 1
 }
 
 function formatLetter(index: number, expr: Expression, uppercase: boolean): string {

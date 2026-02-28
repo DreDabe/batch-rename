@@ -41,8 +41,16 @@ function getExpressionType(typeStr: string): ExpressionType {
 function parseStart(format?: string): number | undefined {
   if (!format) return undefined
 
-  const startMatch = format.match(/^(\d+)/)
-  return startMatch ? parseInt(startMatch[1], 10) : undefined
+  if (/^0+$/.test(format)) return undefined
+
+  const parts = format.split('/')
+  if (parts[0]) {
+    const num = parseInt(parts[0], 10)
+    if (!isNaN(num) && num > 0 && !parts[0].startsWith('0')) {
+      return num
+    }
+  }
+  return undefined
 }
 
 function parseStep(format?: string): number | undefined {
