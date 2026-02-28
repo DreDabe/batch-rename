@@ -1,6 +1,9 @@
 import { FileList, FileListToolbar, FavoritesPanel, PreviewPanel, RulePanel, TopMenuBar, StatusBar } from './components'
+import { useKeyboardShortcuts, ShortcutHelp } from './hooks/useKeyboardShortcuts.tsx'
 
 function App() {
+  useKeyboardShortcuts()
+
   return (
     <div className="h-screen flex flex-col bg-gray-100">
       <header className="bg-white shadow-sm border-b">
@@ -15,7 +18,7 @@ function App() {
           <FavoritesPanel />
           <div className="flex-1 overflow-auto">
             <div className="p-3 text-xs text-gray-400">
-              提示: 使用 Shift 连续选择，Ctrl 多选
+              <ShortcutHelp />
             </div>
           </div>
         </aside>
