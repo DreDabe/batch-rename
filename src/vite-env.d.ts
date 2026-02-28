@@ -10,6 +10,8 @@ interface FileSystemAPI {
   copy: (source: string, destination: string) => Promise<OperationResult>
   move: (source: string, destination: string) => Promise<OperationResult>
   exists: (targetPath: string) => Promise<boolean>
+  readFile: (targetPath: string, maxSize?: number) => Promise<OperationResult<string>>
+  readImageBase64: (targetPath: string) => Promise<OperationResult<string>>
 }
 
 interface DialogAPI {

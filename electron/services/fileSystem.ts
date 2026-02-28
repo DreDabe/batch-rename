@@ -153,6 +153,49 @@ export class FileSystemService {
     }
   }
 
+  async readFile(targetPath: string, maxSize = 1024 * 1024): Promise<OperationResult<string>> {
+    try {
+      const stats = await fs.stat(targetPath)
+      if (stats.size > maxSize) {
+        return {
+          success: false,
+          error: `文件过大 (${Math.round(stats.size / 1024)}KB)，超过预览限制`,
+        }
+      }
+      const content = await fs.readFile(targetPath, 'utf-8')
+      return { success: true, data: content }
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      }
+    }
+  }
+
+  async readImageBase64(targetPath: string): Promise<OperationResult<string>> {
+    try {
+      const buffer = await fs.readFile(targetPath)
+      const ext = path.extname(targetPath).toLowerCase()
+      const mimeTypes: Record<string, string> = {
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.png': 'image/png',
+        '.gif': 'image/gif',
+        '.webp': 'image/webp',
+        '.bmp': 'image/bmp',
+        '.svg': 'image/svg+xml',
+      }
+      const mimeType = mimeTypes[ext] || 'application/octet-stream'
+      const base64 = buffer.toString('base64')
+      return { success: true, data: `data:${mimeType};base64,${base64}` }
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      }
+    }
+  }
+
   getAppPath(): string {
     return app.getPath('userData')
   }

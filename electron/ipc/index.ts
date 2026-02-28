@@ -79,6 +79,14 @@ export function registerIpcHandlers(): void {
     return fileSystemService.exists(targetPath)
   })
 
+  ipcMain.handle('fs:readFile', async (_event, targetPath: string, maxSize?: number) => {
+    return fileSystemService.readFile(targetPath, maxSize)
+  })
+
+  ipcMain.handle('fs:readImageBase64', async (_event, targetPath: string) => {
+    return fileSystemService.readImageBase64(targetPath)
+  })
+
   // Dialog Operations
   ipcMain.handle('dialog:openDirectory', async (event) => {
     const window = BrowserWindow.fromWebContents(event.sender)

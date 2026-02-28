@@ -14,6 +14,10 @@ export const electronAPI = {
     move: (source: string, destination: string) =>
       ipcRenderer.invoke('fs:move', source, destination),
     exists: (targetPath: string) => ipcRenderer.invoke('fs:exists', targetPath),
+    readFile: (targetPath: string, maxSize?: number) =>
+      ipcRenderer.invoke('fs:readFile', targetPath, maxSize),
+    readImageBase64: (targetPath: string) =>
+      ipcRenderer.invoke('fs:readImageBase64', targetPath),
   },
 
   // Dialog
