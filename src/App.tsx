@@ -1,10 +1,13 @@
-import { FileList, FileListToolbar, FavoritesPanel, PreviewPanel, RulePanel } from './components'
+import { FileList, FileListToolbar, FavoritesPanel, PreviewPanel, RulePanel, TopMenuBar, StatusBar } from './components'
 
 function App() {
   return (
     <div className="h-screen flex flex-col bg-gray-100">
-      <header className="bg-white shadow-sm border-b px-4 py-3">
-        <h1 className="text-lg font-semibold text-gray-800">批量重命名工具</h1>
+      <header className="bg-white shadow-sm border-b">
+        <div className="px-4 py-3">
+          <h1 className="text-lg font-semibold text-gray-800">批量重命名工具</h1>
+        </div>
+        <TopMenuBar />
       </header>
 
       <div className="flex-1 flex overflow-hidden">
@@ -32,6 +35,8 @@ function App() {
           </div>
         </main>
       </div>
+
+      <StatusBar />
     </div>
   )
 }
