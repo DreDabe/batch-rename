@@ -1,5 +1,8 @@
 import { create } from 'zustand'
 import type { FileItem } from '../types'
+import { createModuleLogger } from '../utils/logger'
+
+const log = createModuleLogger('FileListStore')
 
 export type SortField = 'name' | 'size' | 'modifiedAt' | 'extension'
 export type SortOrder = 'asc' | 'desc'
@@ -63,10 +66,22 @@ export const useFileListStore = create<FileListState>((set, get) => ({
   lastSelectedIndex: -1,
   searchQuery: '',
 
-  setFiles: (files) => set({ files, selectedFiles: new Set(), lastSelectedIndex: -1 }),
-  setCurrentPath: (path) => set({ currentPath: path }),
-  setLoading: (isLoading) => set({ isLoading }),
-  setError: (error) => set({ error }),
+  setFiles: (files) => {
+    log.debug(`设置文件列表，共 ${files.length} 个文件`)
+    set({ files, selectedFiles: new Set(), lastSelectedIndex: -1 })
+  },
+  setCurrentPath: (path) => {
+    log.info(`切换目录: ${path || '(空)'}`)
+    set({ currentPath: path })
+  },
+  setLoading: (isLoading) => {
+    log.debug(`加载状态: ${isLoading}`)
+    set({ isLoading })
+  },
+  setError: (error) => {
+    if (error) log.error(error)
+    set({ error })
+  },
 
   selectFile: (path, index, isCtrl, isShift) => {
     const { files, selectedFiles, lastSelectedIndex } = get()
@@ -80,13 +95,16 @@ export const useFileListStore = create<FileListState>((set, get) => ({
         newSelected.add(files[i].path)
       }
 
+      log.debug(`Shift选择: ${start} - ${end}, 共 ${newSelected.size} 个`)
       set({ selectedFiles: newSelected })
     } else if (isCtrl) {
       const newSelected = new Set(selectedFiles)
       if (newSelected.has(path)) {
         newSelected.delete(path)
+        log.debug(`Ctrl取消选择: ${path}`)
       } else {
         newSelected.add(path)
+        log.debug(`Ctrl添加选择: ${path}`)
       }
       set({ selectedFiles: newSelected, lastSelectedIndex: index })
     } else {

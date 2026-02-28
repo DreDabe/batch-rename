@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useFileListStore, formatFileSize } from '../stores/fileListStore'
 import { getFileIcon, getFileTypeLabel } from '../utils/fileIcons'
+import { createModuleLogger } from '../utils/logger'
 import type { FileItem } from '../types'
+
+const log = createModuleLogger('FileList')
 
 const ITEM_HEIGHT = 40
 const OVERSCAN = 5
@@ -116,17 +119,21 @@ export function FileList() {
         return
       }
 
+      log.info(`开始加载目录: ${currentPath}`)
       setLoading(true)
       setError(null)
 
       try {
         const result = await window.electronAPI.fs.readDirectory(currentPath)
         if (result.success && result.data) {
+          log.info(`加载成功，共 ${result.data.files.length} 个文件`)
           setFiles(result.data.files)
         } else {
+          log.error(`加载失败: ${result.error}`)
           setError(result.error || '读取目录失败')
         }
       } catch (err) {
+        log.error(`加载异常: ${err instanceof Error ? err.message : '未知错误'}`)
         setError(err instanceof Error ? err.message : '未知错误')
       } finally {
         setLoading(false)

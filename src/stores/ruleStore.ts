@@ -2,6 +2,9 @@ import { create } from 'zustand'
 import type { RenamePreview } from '../types/rules'
 import type { FileItem } from '../types'
 import { createRenameEngine } from '../utils/ruleEngine'
+import { createModuleLogger } from '../utils/logger'
+
+const log = createModuleLogger('RuleStore')
 
 export interface RuleConfig {
   pattern: string
@@ -53,6 +56,8 @@ export const useRuleStore = create<RuleState>((set, get) => ({
   generatePreviews: (files) => {
     const pattern = get().getPatternString()
 
+    log.debug(`生成预览，文件数: ${files.length}, 规则: ${pattern}`)
+
     if (!pattern || files.length === 0) {
       set({ previews: [], error: null })
       return
@@ -62,16 +67,19 @@ export const useRuleStore = create<RuleState>((set, get) => ({
     const validation = engine.validate()
 
     if (!validation.valid) {
+      log.warn(`规则验证失败: ${validation.error}`)
       set({ previews: [], error: validation.error || '规则无效' })
       return
     }
 
     const previews = engine.preview(files)
+    log.info(`生成 ${previews.length} 个预览`)
     set({ previews, error: null })
   },
 
   executeRename: async () => {
     const { previews } = get()
+    log.info(`开始执行重命名，共 ${previews.length} 个文件`)
     set({ isExecuting: true, error: null })
 
     let success = 0
@@ -79,6 +87,7 @@ export const useRuleStore = create<RuleState>((set, get) => ({
 
     for (const preview of previews) {
       if (preview.hasConflict) {
+        log.warn(`跳过冲突文件: ${preview.originalName}`)
         failed++
         continue
       }
@@ -89,15 +98,19 @@ export const useRuleStore = create<RuleState>((set, get) => ({
           preview.newPath
         )
         if (result.success) {
+          log.debug(`重命名成功: ${preview.originalName} -> ${preview.newName}`)
           success++
         } else {
+          log.error(`重命名失败: ${preview.originalName} - ${result.error}`)
           failed++
         }
-      } catch {
+      } catch (err) {
+        log.error(`重命名异常: ${preview.originalName} - ${err instanceof Error ? err.message : '未知错误'}`)
         failed++
       }
     }
 
+    log.info(`执行完成，成功: ${success}, 失败: ${failed}`)
     set({ isExecuting: false })
     return { success, failed }
   },

@@ -1,5 +1,9 @@
 import { useState, useCallback } from 'react'
 import { useFileListStore } from '../stores/fileListStore'
+import { createModuleLogger } from '../utils/logger'
+import { SettingsModal } from './SettingsModal'
+
+const log = createModuleLogger('TopMenuBar')
 
 interface MenuItem {
   id: string
@@ -18,8 +22,10 @@ export function TopMenuBar() {
   const setFiles = useFileListStore((state) => state.setFiles)
 
   const handleOpenDirectory = useCallback(async () => {
+    log.info('打开目录对话框')
     const path = await window.electronAPI.dialog.openDirectory()
     if (path) {
+      log.info(`选择目录: ${path}`)
       setCurrentPath(path)
     }
   }, [setCurrentPath])
@@ -30,13 +36,16 @@ export function TopMenuBar() {
     const name = prompt('请输入文件夹名称')
     if (!name) return
 
+    log.info(`创建文件夹: ${name}`)
     const result = await window.electronAPI.fs.createFolder(currentPath, name)
     if (result.success) {
+      log.info('创建成功，刷新列表')
       const refreshResult = await window.electronAPI.fs.readDirectory(currentPath)
       if (refreshResult.success && refreshResult.data) {
         setFiles(refreshResult.data.files)
       }
     } else {
+      log.error(`创建失败: ${result.error}`)
       alert(result.error || '创建失败')
     }
   }, [currentPath, setFiles])
@@ -47,6 +56,7 @@ export function TopMenuBar() {
     const confirmed = confirm(`确定要删除 ${selectedFiles.length} 个文件吗？`)
     if (!confirmed) return
 
+    log.info(`删除 ${selectedFiles.length} 个文件`)
     for (const file of selectedFiles) {
       await window.electronAPI.fs.delete(file.path, true)
     }
@@ -61,6 +71,7 @@ export function TopMenuBar() {
 
   const handleAddFavorite = useCallback(async () => {
     if (!currentPath) return
+    log.info(`添加收藏: ${currentPath}`)
     await window.electronAPI.config.addFavorite(currentPath)
     alert('已添加到收藏夹')
   }, [currentPath])
@@ -99,31 +110,5 @@ export function TopMenuBar() {
         <SettingsModal onClose={() => setShowSettings(false)} />
       )}
     </>
-  )
-}
-
-function SettingsModal({ onClose }: { onClose: () => void }) {
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-96">
-        <div className="flex items-center justify-between px-4 py-3 border-b">
-          <h3 className="text-lg font-medium">设置</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            ✕
-          </button>
-        </div>
-        <div className="p-4">
-          <p className="text-sm text-gray-500 text-center">设置功能开发中...</p>
-        </div>
-        <div className="px-4 py-3 border-t bg-gray-50 flex justify-end">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm bg-gray-200 rounded hover:bg-gray-300"
-          >
-            关闭
-          </button>
-        </div>
-      </div>
-    </div>
   )
 }
