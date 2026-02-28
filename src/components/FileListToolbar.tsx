@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react'
 import { useFileListStore, type SortField } from '../stores/fileListStore'
+import { useActionLogger } from '../hooks/useActionLogger'
 
 const SORT_OPTIONS: { value: SortField; label: string }[] = [
   { value: 'name', label: '文件名' },
@@ -22,6 +23,11 @@ export function FileListToolbar() {
     selectedFiles,
   } = useFileListStore()
 
+  const { logClick, logInput, logSelect } = useActionLogger({
+    module: 'FileListToolbar',
+    componentName: 'FileListToolbar',
+  })
+
   const [showFilterPanel, setShowFilterPanel] = useState(false)
   const [filterType, setFilterType] = useState<'extension' | 'name'>('extension')
   const [filterValue, setFilterValue] = useState('')
@@ -29,29 +35,67 @@ export function FileListToolbar() {
   const files = getFilteredAndSortedFiles()
 
   const handleOpenDirectory = useCallback(async () => {
+    logClick('打开目录按钮')
     const path = await window.electronAPI.dialog.openDirectory()
     if (path) {
       useFileListStore.getState().setCurrentPath(path)
     }
-  }, [])
+  }, [logClick])
 
   const handleAddFilter = useCallback(() => {
     if (filterValue.trim()) {
+      logClick('添加过滤器按钮', { type: filterType, value: filterValue })
       useFileListStore.getState().addFilter({
         type: filterType,
         value: filterValue.trim(),
       })
       setFilterValue('')
     }
-  }, [filterType, filterValue])
+  }, [filterType, filterValue, logClick])
 
   const handleSelectAll = useCallback(() => {
     if (selectedFiles.size === files.length) {
+      logClick('取消全选按钮')
       deselectAll()
     } else {
+      logClick('全选按钮')
       selectAll()
     }
-  }, [selectedFiles.size, files.length, selectAll, deselectAll])
+  }, [selectedFiles.size, files.length, selectAll, deselectAll, logClick])
+
+  const handleToggleFilterPanel = useCallback(() => {
+    logClick('过滤面板切换按钮', { willShow: !showFilterPanel })
+    setShowFilterPanel(!showFilterPanel)
+  }, [showFilterPanel, logClick])
+
+  const handleSortChange = useCallback((field: SortField) => {
+    logSelect('排序字段', field)
+    setSort(field)
+  }, [setSort, logSelect])
+
+  const handleSortOrderToggle = useCallback(() => {
+    logClick('排序方向切换', { currentOrder: sortOrder })
+    setSort(sortField)
+  }, [sortField, sortOrder, setSort, logClick])
+
+  const handleSearchChange = useCallback((value: string) => {
+    logInput('搜索框', value.length > 20 ? `${value.substring(0, 20)}...` : value)
+    setSearchQuery(value)
+  }, [setSearchQuery, logInput])
+
+  const handleClearSearch = useCallback(() => {
+    logClick('清除搜索按钮')
+    setSearchQuery('')
+  }, [setSearchQuery, logClick])
+
+  const handleFilterTypeChange = useCallback((type: 'extension' | 'name') => {
+    logSelect('过滤器类型', type)
+    setFilterType(type)
+  }, [logSelect])
+
+  const handleFilterValueChange = useCallback((value: string) => {
+    setFilterValue(value)
+  }, [])
 
   return (
     <div className="border-b bg-white">
@@ -79,7 +123,7 @@ export function FileListToolbar() {
           <span className="text-xs text-gray-500">排序:</span>
           <select
             value={sortField}
-            onChange={(e) => setSort(e.target.value as SortField)}
+            onChange={(e) => handleSortChange(e.target.value as SortField)}
             className="text-sm border rounded px-2 py-1 bg-white"
           >
             {SORT_OPTIONS.map((opt) => (
@@ -89,7 +133,7 @@ export function FileListToolbar() {
             ))}
           </select>
           <button
-            onClick={() => setSort(sortField)}
+            onClick={handleSortOrderToggle}
             className="px-2 py-1 text-gray-500 hover:bg-gray-100 rounded"
           >
             {sortOrder === 'asc' ? '↑' : '↓'}
@@ -99,7 +143,7 @@ export function FileListToolbar() {
         <div className="h-5 w-px bg-gray-200" />
 
         <button
-          onClick={() => setShowFilterPanel(!showFilterPanel)}
+          onClick={handleToggleFilterPanel}
           className={`px-2 py-1.5 text-sm rounded transition-colors ${
             showFilterPanel ? 'bg-blue-100 text-blue-600' : 'text-gray-600 hover:bg-gray-100'
           }`}
@@ -114,12 +158,12 @@ export function FileListToolbar() {
             type="text"
             placeholder="搜索文件..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="w-48 px-3 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           {searchQuery && (
             <button
-              onClick={() => setSearchQuery('')}
+              onClick={handleClearSearch}
               className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
             >
               ✕
@@ -132,7 +176,7 @@ export function FileListToolbar() {
         <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border-t">
           <select
             value={filterType}
-            onChange={(e) => setFilterType(e.target.value as 'extension' | 'name')}
+            onChange={(e) => handleFilterTypeChange(e.target.value as 'extension' | 'name')}
             className="text-sm border rounded px-2 py-1 bg-white"
           >
             <option value="extension">扩展名</option>
@@ -142,7 +186,7 @@ export function FileListToolbar() {
             type="text"
             placeholder={filterType === 'extension' ? '例如: jpg, png' : '输入文件名关键词'}
             value={filterValue}
-            onChange={(e) => setFilterValue(e.target.value)}
+            onChange={(e) => handleFilterValueChange(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleAddFilter()}
             className="flex-1 px-3 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
           />

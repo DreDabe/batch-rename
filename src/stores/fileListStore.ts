@@ -67,11 +67,24 @@ export const useFileListStore = create<FileListState>((set, get) => ({
   searchQuery: '',
 
   setFiles: (files) => {
+    const prevFiles = get().files
+    log.logStateChange({
+      message: '文件列表更新',
+      previousState: { count: prevFiles.length },
+      newState: { count: files.length },
+    })
     log.debug(`设置文件列表，共 ${files.length} 个文件`)
     set({ files, selectedFiles: new Set(), lastSelectedIndex: -1 })
   },
   setCurrentPath: (path) => {
-    log.info(`切换目录: ${path || '(空)'}`)
+    const prevPath = get().currentPath
+    log.logAction({
+      actionType: 'navigate',
+      message: `切换目录`,
+      previousState: { path: prevPath },
+      newState: { path },
+      data: { from: prevPath, to: path },
+    })
     set({ currentPath: path })
   },
   setLoading: (isLoading) => {
@@ -79,7 +92,12 @@ export const useFileListStore = create<FileListState>((set, get) => ({
     set({ isLoading })
   },
   setError: (error) => {
-    if (error) log.error(error)
+    if (error) {
+      log.logError({
+        message: '文件列表错误',
+        data: { error },
+      })
+    }
     set({ error })
   },
 
@@ -95,45 +113,88 @@ export const useFileListStore = create<FileListState>((set, get) => ({
         newSelected.add(files[i].path)
       }
 
-      log.debug(`Shift选择: ${start} - ${end}, 共 ${newSelected.size} 个`)
+      log.logAction({
+        actionType: 'select',
+        message: `Shift范围选择`,
+        data: { start, end, count: newSelected.size },
+      })
       set({ selectedFiles: newSelected })
     } else if (isCtrl) {
       const newSelected = new Set(selectedFiles)
       if (newSelected.has(path)) {
         newSelected.delete(path)
-        log.debug(`Ctrl取消选择: ${path}`)
+        log.logAction({
+          actionType: 'select',
+          message: `Ctrl取消选择`,
+          data: { path, selectedCount: newSelected.size },
+        })
       } else {
         newSelected.add(path)
-        log.debug(`Ctrl添加选择: ${path}`)
+        log.logAction({
+          actionType: 'select',
+          message: `Ctrl添加选择`,
+          data: { path, selectedCount: newSelected.size },
+        })
       }
       set({ selectedFiles: newSelected, lastSelectedIndex: index })
     } else {
+      log.logAction({
+        actionType: 'select',
+        message: `单选文件`,
+        data: { path, index },
+      })
       set({ selectedFiles: new Set([path]), lastSelectedIndex: index })
     }
   },
 
   selectAll: () => {
     const { files } = get()
+    const count = files.length
+    log.logAction({
+      actionType: 'select',
+      message: `全选文件`,
+      data: { count },
+    })
     set({ selectedFiles: new Set(files.map((f) => f.path)) })
   },
 
-  deselectAll: () => set({ selectedFiles: new Set(), lastSelectedIndex: -1 }),
+  deselectAll: () => {
+    const prevSize = get().selectedFiles.size
+    log.logAction({
+      actionType: 'select',
+      message: `取消全选`,
+      data: { previousCount: prevSize },
+    })
+    set({ selectedFiles: new Set(), lastSelectedIndex: -1 })
+  },
 
   toggleSelect: (path) => {
     const { selectedFiles } = get()
     const newSelected = new Set(selectedFiles)
-    if (newSelected.has(path)) {
+    const wasSelected = newSelected.has(path)
+    if (wasSelected) {
       newSelected.delete(path)
     } else {
       newSelected.add(path)
     }
+    log.logAction({
+      actionType: 'select',
+      message: `切换选择状态`,
+      data: { path, wasSelected, nowSelected: !wasSelected },
+    })
     set({ selectedFiles: newSelected })
   },
 
   setSort: (field) => {
     const { sortField, sortOrder } = get()
+    const newOrder = sortField === field ? (sortOrder === 'asc' ? 'desc' : 'asc') : 'asc'
+    log.logAction({
+      actionType: 'select',
+      message: `更改排序`,
+      data: { field, order: newOrder },
+    })
     if (sortField === field) {
-      set({ sortOrder: sortOrder === 'asc' ? 'desc' : 'asc' })
+      set({ sortOrder: newOrder })
     } else {
       set({ sortField: field, sortOrder: 'asc' })
     }
@@ -141,17 +202,46 @@ export const useFileListStore = create<FileListState>((set, get) => ({
 
   addFilter: (filter) => {
     const { filters } = get()
+    log.logAction({
+      actionType: 'input',
+      message: `添加过滤器`,
+      data: { filter },
+    })
     set({ filters: [...filters, filter] })
   },
 
   removeFilter: (index) => {
     const { filters } = get()
+    const removed = filters[index]
+    log.logAction({
+      actionType: 'delete',
+      message: `移除过滤器`,
+      data: { index, filter: removed },
+    })
     set({ filters: filters.filter((_, i) => i !== index) })
   },
 
-  clearFilters: () => set({ filters: [] }),
+  clearFilters: () => {
+    const { filters } = get()
+    log.logAction({
+      actionType: 'delete',
+      message: `清空所有过滤器`,
+      data: { count: filters.length },
+    })
+    set({ filters: [] })
+  },
 
-  setSearchQuery: (query) => set({ searchQuery: query }),
+  setSearchQuery: (query) => {
+    const prevQuery = get().searchQuery
+    if (query !== prevQuery) {
+      log.logAction({
+        actionType: 'input',
+        message: `搜索查询`,
+        data: { query: query.substring(0, 50) },
+      })
+    }
+    set({ searchQuery: query })
+  },
 
   getFilteredAndSortedFiles: () => {
     const { files, sortField, sortOrder, filters, searchQuery } = get()

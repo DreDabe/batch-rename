@@ -1,8 +1,39 @@
 import { FileList, FileListToolbar, FavoritesPanel, PreviewPanel, RulePanel, TopMenuBar, StatusBar } from './components'
 import { useKeyboardShortcuts, ShortcutHelp } from './hooks/useKeyboardShortcuts.tsx'
+import { useGlobalErrorHandler } from './hooks/useActionLogger'
+import { useEffect } from 'react'
+import { logger } from './utils/logger'
 
 function App() {
   useKeyboardShortcuts()
+  useGlobalErrorHandler()
+
+  useEffect(() => {
+    logger.logAction({
+      module: 'App',
+      actionType: 'load',
+      message: '应用启动',
+      level: 'info',
+    })
+
+    const handleBeforeUnload = () => {
+      logger.logAction({
+        module: 'App',
+        actionType: 'navigate',
+        message: '应用关闭',
+        level: 'info',
+        data: {
+          sessionDuration: logger.getSessionDuration(),
+          userPathLength: logger.getUserPath().length,
+        },
+      })
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
+  }, [])
 
   return (
     <div className="h-screen flex flex-col bg-gray-100">

@@ -48,6 +48,14 @@ export const useRuleStore = create<RuleState>((set, get) => ({
   error: null,
 
   setRuleConfig: (config) => {
+    const prevConfig = get().ruleConfig
+    log.logAction({
+      actionType: 'input',
+      message: '更新规则配置',
+      previousState: prevConfig,
+      newState: { ...prevConfig, ...config },
+      data: { changes: config },
+    })
     set((state) => ({
       ruleConfig: { ...state.ruleConfig, ...config },
     }))
@@ -56,7 +64,11 @@ export const useRuleStore = create<RuleState>((set, get) => ({
   generatePreviews: (files) => {
     const pattern = get().getPatternString()
 
-    log.debug(`生成预览，文件数: ${files.length}, 规则: ${pattern}`)
+    log.logAction({
+      actionType: 'load',
+      message: `生成预览`,
+      data: { fileCount: files.length, pattern },
+    })
 
     if (!pattern || files.length === 0) {
       set({ previews: [], error: null })
@@ -67,27 +79,43 @@ export const useRuleStore = create<RuleState>((set, get) => ({
     const validation = engine.validate()
 
     if (!validation.valid) {
-      log.warn(`规则验证失败: ${validation.error}`)
+      log.logError({
+        message: '规则验证失败',
+        data: { error: validation.error },
+      })
       set({ previews: [], error: validation.error || '规则无效' })
       return
     }
 
     const previews = engine.preview(files)
-    log.info(`生成 ${previews.length} 个预览`)
+    const conflictCount = previews.filter((p) => p.hasConflict).length
+    log.logAction({
+      actionType: 'load',
+      message: `预览生成完成`,
+      data: { previewCount: previews.length, conflictCount },
+    })
     set({ previews, error: null })
   },
 
   executeRename: async () => {
     const { previews } = get()
-    log.info(`开始执行重命名，共 ${previews.length} 个文件`)
+    log.logAction({
+      actionType: 'execute',
+      message: `开始执行重命名`,
+      data: { fileCount: previews.length },
+    })
     set({ isExecuting: true, error: null })
 
     let success = 0
     let failed = 0
+    const timer = log.startTimer()
 
     for (const preview of previews) {
       if (preview.hasConflict) {
-        log.warn(`跳过冲突文件: ${preview.originalName}`)
+        log.logError({
+          message: '跳过冲突文件',
+          data: { originalName: preview.originalName, conflictType: preview.conflictType },
+        })
         failed++
         continue
       }
@@ -98,24 +126,46 @@ export const useRuleStore = create<RuleState>((set, get) => ({
           preview.newPath
         )
         if (result.success) {
-          log.debug(`重命名成功: ${preview.originalName} -> ${preview.newName}`)
+          log.logAction({
+            actionType: 'update',
+            message: '重命名成功',
+            data: { from: preview.originalName, to: preview.newName },
+          })
           success++
         } else {
-          log.error(`重命名失败: ${preview.originalName} - ${result.error}`)
+          log.logError({
+            message: '重命名失败',
+            data: { originalName: preview.originalName, error: result.error },
+          })
           failed++
         }
       } catch (err) {
-        log.error(`重命名异常: ${preview.originalName} - ${err instanceof Error ? err.message : '未知错误'}`)
+        log.logError({
+          message: '重命名异常',
+          error: err,
+          data: { originalName: preview.originalName },
+        })
         failed++
       }
     }
 
-    log.info(`执行完成，成功: ${success}, 失败: ${failed}`)
+    const duration = timer()
+    log.logAction({
+      actionType: 'execute',
+      message: `重命名执行完成`,
+      data: { success, failed, duration },
+    })
     set({ isExecuting: false })
     return { success, failed }
   },
 
   clearPreviews: () => {
+    const prevCount = get().previews.length
+    log.logAction({
+      actionType: 'delete',
+      message: '清空预览',
+      data: { previousCount: prevCount },
+    })
     set({ previews: [], error: null })
   },
 

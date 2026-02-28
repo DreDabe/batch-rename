@@ -1,9 +1,7 @@
 import { useState, useCallback } from 'react'
 import { useFileListStore } from '../stores/fileListStore'
-import { createModuleLogger } from '../utils/logger'
+import { useActionLogger } from '../hooks/useActionLogger'
 import { SettingsModal } from './SettingsModal'
-
-const log = createModuleLogger('TopMenuBar')
 
 interface MenuItem {
   id: string
@@ -21,42 +19,80 @@ export function TopMenuBar() {
   const setCurrentPath = useFileListStore((state) => state.setCurrentPath)
   const setFiles = useFileListStore((state) => state.setFiles)
 
+  const { logClick, logAction, logError } = useActionLogger({
+    module: 'TopMenuBar',
+    componentName: 'TopMenuBar',
+  })
+
   const handleOpenDirectory = useCallback(async () => {
-    log.info('打开目录对话框')
+    logClick('打开目录菜单项')
+    logAction({
+      actionType: 'navigate',
+      message: '打开目录对话框',
+    })
     const path = await window.electronAPI.dialog.openDirectory()
     if (path) {
-      log.info(`选择目录: ${path}`)
+      logAction({
+        actionType: 'navigate',
+        message: `选择目录`,
+        data: { path },
+      })
       setCurrentPath(path)
     }
-  }, [setCurrentPath])
+  }, [setCurrentPath, logClick, logAction])
 
   const handleCreateFolder = useCallback(async () => {
     if (!currentPath) return
 
+    logClick('新建文件夹菜单项')
     const name = prompt('请输入文件夹名称')
     if (!name) return
 
-    log.info(`创建文件夹: ${name}`)
+    logAction({
+      actionType: 'create',
+      message: '创建文件夹',
+      data: { name, parentPath: currentPath },
+    })
+
     const result = await window.electronAPI.fs.createFolder(currentPath, name)
     if (result.success) {
-      log.info('创建成功，刷新列表')
+      logAction({
+        actionType: 'create',
+        message: '文件夹创建成功，刷新列表',
+        data: { name },
+      })
       const refreshResult = await window.electronAPI.fs.readDirectory(currentPath)
       if (refreshResult.success && refreshResult.data) {
         setFiles(refreshResult.data.files)
       }
     } else {
-      log.error(`创建失败: ${result.error}`)
+      logError({
+        message: '创建文件夹失败',
+        data: { name, error: result.error },
+      })
       alert(result.error || '创建失败')
     }
-  }, [currentPath, setFiles])
+  }, [currentPath, setFiles, logClick, logAction, logError])
 
   const handleDelete = useCallback(async () => {
     if (selectedFiles.length === 0) return
 
+    logClick('删除菜单项')
     const confirmed = confirm(`确定要删除 ${selectedFiles.length} 个文件吗？`)
-    if (!confirmed) return
+    if (!confirmed) {
+      logAction({
+        actionType: 'delete',
+        message: '用户取消删除操作',
+      })
+      return
+    }
 
-    log.info(`删除 ${selectedFiles.length} 个文件`)
+    logAction({
+      actionType: 'delete',
+      message: `删除文件`,
+      data: { count: selectedFiles.length, files: selectedFiles.map(f => f.name) },
+    })
+
     for (const file of selectedFiles) {
       await window.electronAPI.fs.delete(file.path, true)
     }
@@ -67,21 +103,43 @@ export function TopMenuBar() {
         setFiles(result.data.files)
       }
     }
-  }, [selectedFiles, currentPath, setFiles])
+  }, [selectedFiles, currentPath, setFiles, logClick, logAction])
 
   const handleAddFavorite = useCallback(async () => {
     if (!currentPath) return
-    log.info(`添加收藏: ${currentPath}`)
+    logClick('添加收藏菜单项')
+    logAction({
+      actionType: 'save',
+      message: `添加收藏`,
+      data: { path: currentPath },
+    })
     await window.electronAPI.config.addFavorite(currentPath)
     alert('已添加到收藏夹')
-  }, [currentPath])
+  }, [currentPath, logClick, logAction])
+
+  const handleOpenSettings = useCallback(() => {
+    logClick('设置菜单项')
+    logAction({
+      actionType: 'navigate',
+      message: '打开设置对话框',
+    })
+    setShowSettings(true)
+  }, [logClick, logAction])
+
+  const handleCloseSettings = useCallback(() => {
+    logAction({
+      actionType: 'navigate',
+      message: '关闭设置对话框',
+    })
+    setShowSettings(false)
+  }, [logAction])
 
   const menuItems: MenuItem[] = [
     { id: 'open', label: '打开目录', icon: '📂', onClick: handleOpenDirectory },
     { id: 'newFolder', label: '新建文件夹', icon: '📁', onClick: handleCreateFolder, disabled: !currentPath },
     { id: 'delete', label: '删除', icon: '🗑️', onClick: handleDelete, disabled: selectedFiles.length === 0, danger: true },
     { id: 'favorite', label: '添加收藏', icon: '⭐', onClick: handleAddFavorite, disabled: !currentPath },
-    { id: 'settings', label: '设置', icon: '⚙️', onClick: () => setShowSettings(true) },
+    { id: 'settings', label: '设置', icon: '⚙️', onClick: handleOpenSettings },
   ]
 
   return (
@@ -107,7 +165,7 @@ export function TopMenuBar() {
       </div>
 
       {showSettings && (
-        <SettingsModal onClose={() => setShowSettings(false)} />
+        <SettingsModal onClose={handleCloseSettings} />
       )}
     </>
   )

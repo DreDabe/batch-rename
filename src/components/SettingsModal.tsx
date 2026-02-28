@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRuleStore } from '../stores/ruleStore'
 import { ruleManager, type SavedRule } from '../utils/ruleManager'
+import { useActionLogger } from '../hooks/useActionLogger'
 
 interface SettingsModalProps {
   onClose: () => void
@@ -12,47 +13,82 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
   const ruleConfig = useRuleStore((state) => state.ruleConfig)
   const setRuleConfig = useRuleStore((state) => state.setRuleConfig)
 
-  const loadRules = () => {
+  const { logClick, logSelect, logAction, logInput } = useActionLogger({
+    module: 'SettingsModal',
+    componentName: 'SettingsModal',
+  })
+
+  const loadRules = useCallback(() => {
     setSavedRules(ruleManager.getAll())
-  }
+  }, [])
 
   useEffect(() => {
     loadRules()
-  }, [])
+  }, [loadRules])
 
-  const handleSaveRule = () => {
+  const handleSaveRule = useCallback(() => {
+    logClick('保存当前规则按钮')
     const name = prompt('请输入规则名称')
     if (!name) return
 
+    logInput('规则名称', name)
+    logAction({
+      actionType: 'save',
+      message: '保存规则',
+      data: { name, config: ruleConfig },
+    })
     ruleManager.save(name, ruleConfig)
     loadRules()
-  }
+  }, [ruleConfig, loadRules, logClick, logInput, logAction])
 
-  const handleLoadRule = (rule: SavedRule) => {
+  const handleLoadRule = useCallback((rule: SavedRule) => {
+    logClick('加载规则按钮', { ruleName: rule.name })
+    logAction({
+      actionType: 'load',
+      message: '加载规则',
+      data: { ruleId: rule.id, ruleName: rule.name },
+    })
     setRuleConfig(rule.config)
     onClose()
-  }
+  }, [setRuleConfig, onClose, logClick, logAction])
 
-  const handleDeleteRule = (id: string) => {
-    if (confirm('确定要删除此规则吗？')) {
-      ruleManager.delete(id)
-      loadRules()
-    }
-  }
+  const handleDeleteRule = useCallback((id: string, name: string) => {
+    logClick('删除规则按钮', { ruleName: name })
+    const confirmed = confirm('确定要删除此规则吗？')
+    if (!confirmed) return
+
+    logAction({
+      actionType: 'delete',
+      message: '删除规则',
+      data: { ruleId: id, ruleName: name },
+    })
+    ruleManager.delete(id)
+    loadRules()
+  }, [loadRules, logClick, logAction])
+
+  const handleTabChange = useCallback((tab: 'rules' | 'settings') => {
+    logSelect('设置标签页', tab)
+    setActiveTab(tab)
+  }, [logSelect])
+
+  const handleClose = useCallback(() => {
+    logClick('关闭设置按钮')
+    onClose()
+  }, [onClose, logClick])
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-xl w-[500px] max-h-[80vh] flex flex-col">
         <div className="flex items-center justify-between px-4 py-3 border-b">
           <h3 className="text-lg font-medium">设置</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button onClick={handleClose} className="text-gray-400 hover:text-gray-600">
             ✕
           </button>
         </div>
 
         <div className="flex border-b">
           <button
-            onClick={() => setActiveTab('rules')}
+            onClick={() => handleTabChange('rules')}
             className={`flex-1 px-4 py-2 text-sm ${
               activeTab === 'rules'
                 ? 'text-blue-500 border-b-2 border-blue-500'
@@ -62,7 +98,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
             规则管理
           </button>
           <button
-            onClick={() => setActiveTab('settings')}
+            onClick={() => handleTabChange('settings')}
             className={`flex-1 px-4 py-2 text-sm ${
               activeTab === 'settings'
                 ? 'text-blue-500 border-b-2 border-blue-500'
@@ -111,7 +147,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
                           加载
                         </button>
                         <button
-                          onClick={() => handleDeleteRule(rule.id)}
+                          onClick={() => handleDeleteRule(rule.id, rule.name)}
                           className="px-2 py-1 text-xs text-red-500 hover:bg-red-50 rounded"
                         >
                           删除
@@ -163,7 +199,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
 
         <div className="px-4 py-3 border-t bg-gray-50 flex justify-end">
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="px-4 py-2 text-sm bg-gray-200 rounded hover:bg-gray-300"
           >
             关闭

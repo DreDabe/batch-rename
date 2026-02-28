@@ -1,5 +1,6 @@
 import { useFileListStore } from '../stores/fileListStore'
 import { useRuleStore } from '../stores/ruleStore'
+import { LogViewerButton } from './LogViewer'
 
 export function StatusBar() {
   const files = useFileListStore((state) => state.files)
@@ -40,6 +41,7 @@ export function StatusBar() {
         {isExecuting && (
           <span className="text-orange-500">执行中...</span>
         )}
+        <LogViewerButton />
       </div>
     </div>
   )

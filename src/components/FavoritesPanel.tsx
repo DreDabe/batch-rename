@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
+import { useActionLogger } from '../hooks/useActionLogger'
 
 interface FavoriteItem {
   path: string
@@ -8,6 +9,11 @@ interface FavoriteItem {
 export function FavoritesPanel() {
   const [favorites, setFavorites] = useState<FavoriteItem[]>([])
   const [isExpanded, setIsExpanded] = useState(true)
+
+  const { logClick, logAction } = useActionLogger({
+    module: 'FavoritesPanel',
+    componentName: 'FavoritesPanel',
+  })
 
   const loadFavorites = useCallback(async () => {
     const result = await window.electronAPI.config.get()
@@ -25,28 +31,51 @@ export function FavoritesPanel() {
   }, [loadFavorites])
 
   const handleAddFavorite = useCallback(async () => {
+    logClick('添加收藏按钮')
     const path = await window.electronAPI.dialog.openDirectory()
     if (path) {
+      logAction({
+        actionType: 'save',
+        message: '添加收藏',
+        data: { path },
+      })
       await window.electronAPI.config.addFavorite(path)
       loadFavorites()
     }
-  }, [loadFavorites])
+  }, [loadFavorites, logClick, logAction])
 
   const handleRemoveFavorite = useCallback(async (path: string) => {
+    logClick('移除收藏按钮', { path })
+    logAction({
+      actionType: 'delete',
+      message: '移除收藏',
+      data: { path },
+    })
     await window.electronAPI.config.removeFavorite(path)
     loadFavorites()
-  }, [loadFavorites])
+  }, [loadFavorites, logClick, logAction])
 
   const handleSelectFavorite = useCallback(async (path: string) => {
+    logClick('选择收藏项', { path })
+    logAction({
+      actionType: 'navigate',
+      message: '从收藏夹选择目录',
+      data: { path },
+    })
     const { useFileListStore } = await import('../stores/fileListStore')
     useFileListStore.getState().setCurrentPath(path)
-  }, [])
+  }, [logClick, logAction])
+
+  const handleToggleExpand = useCallback(() => {
+    logClick(isExpanded ? '折叠收藏夹' : '展开收藏夹')
+    setIsExpanded(!isExpanded)
+  }, [isExpanded, logClick])
 
   if (!isExpanded) {
     return (
       <div className="border-b bg-white">
         <button
-          onClick={() => setIsExpanded(true)}
+          onClick={handleToggleExpand}
           className="w-full flex items-center justify-between px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
         >
           <span>⭐ 收藏夹</span>
@@ -59,7 +88,7 @@ export function FavoritesPanel() {
   return (
     <div className="border-b bg-white">
       <button
-        onClick={() => setIsExpanded(false)}
+        onClick={handleToggleExpand}
         className="w-full flex items-center justify-between px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
       >
         <span>⭐ 收藏夹</span>
