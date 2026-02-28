@@ -1,48 +1,29 @@
-import { useState } from 'react'
+import { FileList, FileListToolbar, FavoritesPanel } from './components'
 
 function App() {
-  const [message, setMessage] = useState<string>('')
-  const [version, setVersion] = useState<string>('')
-
-  const handleOpenDirectory = async () => {
-    if (window.electronAPI) {
-      const path = await window.electronAPI.dialog.openDirectory()
-      if (path) {
-        setMessage(`Selected: ${path}`)
-      }
-    }
-  }
-
-  const handleCheckVersion = async () => {
-    if (window.electronAPI) {
-      const currentVersion = await window.electronAPI.version.current()
-      setVersion(currentVersion)
-    }
-  }
-
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center">
-      <h1 className="text-3xl font-bold text-gray-800 mb-4">批量重命名工具</h1>
-      <p className="text-gray-600 mb-2">Electron + React + TypeScript + Vite</p>
+    <div className="h-screen flex flex-col bg-gray-100">
+      <header className="bg-white shadow-sm border-b px-4 py-3">
+        <h1 className="text-lg font-semibold text-gray-800">批量重命名工具</h1>
+      </header>
 
-      <div className="mt-6 space-y-4">
-        <button
-          onClick={handleOpenDirectory}
-          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-        >
-          打开目录
-        </button>
+      <div className="flex-1 flex overflow-hidden">
+        <aside className="w-64 bg-white border-r flex flex-col overflow-hidden">
+          <FavoritesPanel />
+          <div className="flex-1 overflow-auto">
+            <div className="p-3 text-xs text-gray-400">
+              提示: 使用 Shift 连续选择，Ctrl 多选
+            </div>
+          </div>
+        </aside>
 
-        <button
-          onClick={handleCheckVersion}
-          className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors ml-2"
-        >
-          检查版本
-        </button>
+        <main className="flex-1 flex flex-col overflow-hidden bg-white">
+          <FileListToolbar />
+          <div className="flex-1 overflow-hidden">
+            <FileList />
+          </div>
+        </main>
       </div>
-
-      {message && <p className="text-green-600 mt-4">{message}</p>}
-      {version && <p className="text-blue-600 mt-2">当前版本: {version}</p>}
     </div>
   )
 }
