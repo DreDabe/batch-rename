@@ -1,4 +1,4 @@
-import { FileList, FileListToolbar, FavoritesPanel, PreviewPanel } from './components'
+import { FileList, FileListToolbar, FavoritesPanel, PreviewPanel, RulePanel } from './components'
 
 function App() {
   return (
@@ -23,8 +23,11 @@ function App() {
             <div className="flex-1 overflow-hidden border-r">
               <FileList />
             </div>
-            <div className="w-80 overflow-hidden">
+            <div className="w-80 overflow-hidden border-r">
               <PreviewPanel />
+            </div>
+            <div className="w-80 overflow-hidden">
+              <RulePanel />
             </div>
           </div>
         </main>
