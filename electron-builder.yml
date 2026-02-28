@@ -1,0 +1,22 @@
+$schema: https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json
+appId: com.batch-rename.app
+productName: 批量重命名工具
+directories:
+  buildResources: build
+  output: release
+files:
+  - dist
+  - dist-electron
+win:
+  icon: build/icon.ico
+  target:
+    - target: nsis
+      arch:
+        - x64
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: 批量重命名工具
+electronVersion: 28.1.0
