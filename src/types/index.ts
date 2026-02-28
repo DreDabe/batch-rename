@@ -68,3 +68,5 @@ export const DEFAULT_CONFIG: AppConfig = {
   favorites: [],
   recentPaths: [],
 }
+
+export * from './rules'
