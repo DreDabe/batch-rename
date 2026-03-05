@@ -1,3 +1,11 @@
+export interface DriveInfo {
+  name: string
+  path: string
+  type: 'fixed' | 'removable' | 'network' | 'cdrom' | 'unknown'
+  size?: number
+  freeSpace?: number
+}
+
 export interface FileItem {
   name: string
   path: string

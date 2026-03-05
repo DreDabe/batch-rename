@@ -1,7 +1,17 @@
 import { app } from 'electron'
 import fs from 'fs/promises'
+import fsSync from 'fs'
 import path from 'path'
+import os from 'os'
 import type { FileItem, DirectoryInfo, OperationResult } from '../src/types'
+
+export interface DriveInfo {
+  name: string
+  path: string
+  type: 'fixed' | 'removable' | 'network' | 'cdrom' | 'unknown'
+  size?: number
+  freeSpace?: number
+}
 
 export class FileSystemService {
   async readDirectory(dirPath: string): Promise<OperationResult<DirectoryInfo>> {
@@ -11,18 +21,22 @@ export class FileSystemService {
 
       for (const entry of entries) {
         const fullPath = path.join(dirPath, entry.name)
-        const stats = await fs.stat(fullPath)
+        try {
+          const stats = await fs.stat(fullPath)
 
-        files.push({
-          name: entry.name,
-          path: fullPath,
-          isDirectory: entry.isDirectory(),
-          isFile: entry.isFile(),
-          size: stats.size,
-          createdAt: stats.birthtime,
-          modifiedAt: stats.mtime,
-          extension: entry.isFile() ? path.extname(entry.name).toLowerCase() : '',
-        })
+          files.push({
+            name: entry.name,
+            path: fullPath,
+            isDirectory: entry.isDirectory(),
+            isFile: entry.isFile(),
+            size: stats.size,
+            createdAt: stats.birthtime,
+            modifiedAt: stats.mtime,
+            extension: entry.isFile() ? path.extname(entry.name).toLowerCase() : '',
+          })
+        } catch (statError) {
+          console.log(`[fileSystem] 跳过无法访问的文件: ${fullPath}`, statError instanceof Error ? statError.message : 'Unknown error')
+        }
       }
 
       return {
@@ -198,6 +212,60 @@ export class FileSystemService {
 
   getAppPath(): string {
     return app.getPath('userData')
+  }
+
+  async getDrives(): Promise<OperationResult<DriveInfo[]>> {
+    try {
+      const drives: DriveInfo[] = []
+      const platform = os.platform()
+
+      if (platform === 'win32') {
+        const commonDrives = ['C:', 'D:', 'E:']
+        
+        for (const driveLetter of commonDrives) {
+          const drivePath = driveLetter + '\\'
+          try {
+            await fs.access(drivePath)
+            drives.push({
+              name: driveLetter,
+              path: drivePath,
+              type: 'fixed',
+            })
+          } catch {
+          }
+        }
+
+        if (drives.length === 0) {
+          drives.push({
+            name: 'C:',
+            path: 'C:\\',
+            type: 'fixed',
+          })
+        }
+      } else {
+        drives.push({
+          name: 'Root',
+          path: '/',
+          type: 'fixed',
+        })
+      }
+
+      return { success: true, data: drives }
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      }
+    }
+  }
+
+  async hasChildren(dirPath: string): Promise<boolean> {
+    try {
+      const entries = await fs.readdir(dirPath, { withFileTypes: true })
+      return entries.some(entry => entry.isDirectory())
+    } catch {
+      return false
+    }
   }
 }
 

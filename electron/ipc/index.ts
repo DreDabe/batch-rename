@@ -87,6 +87,14 @@ export function registerIpcHandlers(): void {
     return fileSystemService.readImageBase64(targetPath)
   })
 
+  ipcMain.handle('fs:getDrives', async () => {
+    return fileSystemService.getDrives()
+  })
+
+  ipcMain.handle('fs:hasChildren', async (_event, dirPath: string) => {
+    return fileSystemService.hasChildren(dirPath)
+  })
+
   // Dialog Operations
   ipcMain.handle('dialog:openDirectory', async (event) => {
     const window = BrowserWindow.fromWebContents(event.sender)

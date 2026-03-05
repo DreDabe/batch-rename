@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import { useFileListStore, type SortField } from '../stores/fileListStore'
 import { useActionLogger } from '../hooks/useActionLogger'
+import { getElectronAPI } from '../utils/electronHelper'
 
 const SORT_OPTIONS: { value: SortField; label: string }[] = [
   { value: 'name', label: '文件名' },
@@ -36,9 +37,23 @@ export function FileListToolbar() {
 
   const handleOpenDirectory = useCallback(async () => {
     logClick('打开目录按钮')
-    const path = await window.electronAPI.dialog.openDirectory()
-    if (path) {
-      useFileListStore.getState().setCurrentPath(path)
+    
+    const electronAPI = getElectronAPI()
+    if (!electronAPI) {
+      const errMsg = '当前环境不是Electron，无法使用文件系统功能'
+      console.error('打开目录失败:', new Error(errMsg))
+      alert(errMsg)
+      return
+    }
+    
+    try {
+      const path = await electronAPI.dialog.openDirectory()
+      if (path) {
+        useFileListStore.getState().setCurrentPath(path)
+      }
+    } catch (err) {
+      console.error('打开目录失败:', err)
+      alert('打开目录失败：' + (err instanceof Error ? err.message : '未知错误'))
     }
   }, [logClick])
 
@@ -124,10 +139,10 @@ export function FileListToolbar() {
           <select
             value={sortField}
             onChange={(e) => handleSortChange(e.target.value as SortField)}
-            className="text-sm border rounded px-2 py-1 bg-white"
+            className="text-sm border border-gray-300 rounded px-2 py-1 bg-white text-gray-700"
           >
             {SORT_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
+              <option key={opt.value} value={opt.value} className="text-gray-700 bg-white">
                 {opt.label}
               </option>
             ))}
@@ -159,7 +174,7 @@ export function FileListToolbar() {
             placeholder="搜索文件..."
             value={searchQuery}
             onChange={(e) => handleSearchChange(e.target.value)}
-            className="w-48 px-3 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-48 px-3 py-1.5 text-sm text-gray-900 bg-white border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           {searchQuery && (
             <button
@@ -177,10 +192,10 @@ export function FileListToolbar() {
           <select
             value={filterType}
             onChange={(e) => handleFilterTypeChange(e.target.value as 'extension' | 'name')}
-            className="text-sm border rounded px-2 py-1 bg-white"
+            className="text-sm border border-gray-300 rounded px-2 py-1 bg-white text-gray-700"
           >
-            <option value="extension">扩展名</option>
-            <option value="name">文件名</option>
+            <option value="extension" className="text-gray-700 bg-white">扩展名</option>
+            <option value="name" className="text-gray-700 bg-white">文件名</option>
           </select>
           <input
             type="text"
@@ -188,7 +203,7 @@ export function FileListToolbar() {
             value={filterValue}
             onChange={(e) => handleFilterValueChange(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleAddFilter()}
-            className="flex-1 px-3 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex-1 px-3 py-1 text-sm text-gray-900 bg-white border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <button
             onClick={handleAddFilter}

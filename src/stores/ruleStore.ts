@@ -6,9 +6,12 @@ import { createModuleLogger } from '../utils/logger'
 
 const log = createModuleLogger('RuleStore')
 
+export type NumberType = 'number' | 'lowerLetter' | 'upperLetter'
+
 export interface RuleConfig {
   pattern: string
-  numberStart: number
+  numberType: NumberType
+  numberStart: number | string
   numberStep: number
   numberDigits: number
   useLetter: boolean
@@ -32,6 +35,7 @@ interface RuleState {
 
 const DEFAULT_RULE_CONFIG: RuleConfig = {
   pattern: '',
+  numberType: 'number',
   numberStart: 1,
   numberStep: 1,
   numberDigits: 4,
@@ -182,8 +186,10 @@ export const useRuleStore = create<RuleState>((set, get) => ({
       parts.push(ruleConfig.prefix)
     }
 
-    if (ruleConfig.useLetter) {
-      parts.push(ruleConfig.letterUppercase ? '{$L}' : '{$l}')
+    if (ruleConfig.numberType === 'lowerLetter') {
+      parts.push('{$l}')
+    } else if (ruleConfig.numberType === 'upperLetter') {
+      parts.push('{$L}')
     } else {
       const digits = ruleConfig.numberDigits
       parts.push(`{$n%0${digits}}`)

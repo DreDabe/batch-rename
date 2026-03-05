@@ -41,7 +41,6 @@ export interface Tag {
   id: string
   name: string
   color: string
-  value: string
 }
 
 // eslint-disable-next-line no-control-regex

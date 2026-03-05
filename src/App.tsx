@@ -1,5 +1,5 @@
-import { FileList, FileListToolbar, FavoritesPanel, PreviewPanel, RulePanel, TopMenuBar, StatusBar } from './components'
-import { useKeyboardShortcuts, ShortcutHelp } from './hooks/useKeyboardShortcuts.tsx'
+import { FileList, FileListToolbar, TreePanel, PreviewPanel, RulePanel, TopMenuBar, StatusBar } from './components'
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts.tsx'
 import { useGlobalErrorHandler } from './hooks/useActionLogger'
 import { useEffect } from 'react'
 import { logger } from './utils/logger'
@@ -45,25 +45,18 @@ function App() {
       </header>
 
       <div className="flex-1 flex overflow-hidden">
-        <aside className="w-64 bg-white border-r flex flex-col overflow-hidden">
-          <FavoritesPanel />
-          <div className="flex-1 overflow-auto">
-            <div className="p-3 text-xs text-gray-400">
-              <ShortcutHelp />
-            </div>
-          </div>
-        </aside>
+        <TreePanel />
 
-        <main className="flex-1 flex flex-col overflow-hidden bg-white">
+        <main className="flex-1 flex flex-col overflow-hidden bg-white min-w-0">
           <FileListToolbar />
           <div className="flex-1 flex overflow-hidden">
-            <div className="flex-1 overflow-hidden border-r">
+            <div className="flex-1 overflow-hidden border-r min-w-0">
               <FileList />
             </div>
-            <div className="w-80 overflow-hidden border-r">
+            <div className="w-80 overflow-hidden border-r flex-shrink-0">
               <PreviewPanel />
             </div>
-            <div className="w-80 overflow-hidden">
+            <div className="w-80 overflow-hidden flex-shrink-0">
               <RulePanel />
             </div>
           </div>

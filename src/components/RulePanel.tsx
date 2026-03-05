@@ -3,64 +3,32 @@ import { useRuleStore } from '../stores/ruleStore'
 import { useFileListStore } from '../stores/fileListStore'
 import { getFileIcon } from '../utils/fileIcons'
 import { useActionLogger } from '../hooks/useActionLogger'
-import type { RenamePreview } from '../types/rules'
+import { tagManager } from '../utils/tagManager'
+import type { RenamePreview, Tag } from '../types/rules'
 
-function RuleInput() {
+function NumberInput() {
   const { ruleConfig, setRuleConfig } = useRuleStore()
-  const { logInput } = useActionLogger({ module: 'RulePanel', componentName: 'RuleInput' })
+  const { logInput, logSelect } = useActionLogger({ module: 'RulePanel', componentName: 'NumberInput' })
 
-  const handlePatternChange = useCallback((value: string) => {
-    logInput('自定义规则', value.length > 30 ? `${value.substring(0, 30)}...` : value)
-    setRuleConfig({ pattern: value })
-  }, [setRuleConfig, logInput])
+  const handleNumberTypeChange = useCallback((type: 'number' | 'lowerLetter' | 'upperLetter') => {
+    logSelect('序号类型', type)
+    if (type === 'number') {
+      setRuleConfig({ numberType: type, numberStart: 1 })
+    } else if (type === 'lowerLetter') {
+      setRuleConfig({ numberType: type, numberStart: 'a' })
+    } else {
+      setRuleConfig({ numberType: type, numberStart: 'A' })
+    }
+  }, [setRuleConfig, logSelect])
 
-  return (
-    <div className="p-3 border-b">
-      <label className="block text-sm font-medium text-gray-700 mb-2">
-        自定义规则
-      </label>
-      <input
-        type="text"
-        value={ruleConfig.pattern}
-        onChange={(e) => handlePatternChange(e.target.value)}
-        placeholder="例如: {$n%04}_{$f}{$ext}"
-        className="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-      />
-      <p className="mt-1 text-xs text-gray-400">
-        留空则使用下方快速设置
-      </p>
-    </div>
-  )
-}
-
-function QuickRuleSettings() {
-  const { ruleConfig, setRuleConfig } = useRuleStore()
-  const { logInput, logClick } = useActionLogger({ module: 'RulePanel', componentName: 'QuickRuleSettings' })
-
-  const handlePrefixChange = useCallback((value: string) => {
-    logInput('前缀', value)
-    setRuleConfig({ prefix: value })
-  }, [setRuleConfig, logInput])
-
-  const handleSuffixChange = useCallback((value: string) => {
-    logInput('后缀', value)
-    setRuleConfig({ suffix: value })
-  }, [setRuleConfig, logInput])
-
-  const handleUseLetterChange = useCallback((checked: boolean) => {
-    logClick('字母序号复选框', { useLetter: checked })
-    setRuleConfig({ useLetter: checked })
-  }, [setRuleConfig, logClick])
-
-  const handleLetterUppercaseChange = useCallback((checked: boolean) => {
-    logClick('大写字母复选框', { letterUppercase: checked })
-    setRuleConfig({ letterUppercase: checked })
-  }, [setRuleConfig, logClick])
-
-  const handleNumberStartChange = useCallback((value: number) => {
+  const handleNumberStartChange = useCallback((value: string) => {
     logInput('起始值', value)
-    setRuleConfig({ numberStart: value || 1 })
-  }, [setRuleConfig, logInput])
+    if (ruleConfig.numberType === 'number') {
+      setRuleConfig({ numberStart: parseInt(value) || 1 })
+    } else {
+      setRuleConfig({ numberStart: value || (ruleConfig.numberType === 'lowerLetter' ? 'a' : 'A') })
+    }
+  }, [ruleConfig.numberType, setRuleConfig, logInput])
 
   const handleNumberStepChange = useCallback((value: number) => {
     logInput('步长', value)
@@ -73,90 +41,237 @@ function QuickRuleSettings() {
   }, [setRuleConfig, logInput])
 
   return (
-    <div className="p-3 border-b space-y-3">
-      <h3 className="text-sm font-medium text-gray-700">快速设置</h3>
+    <div className="p-3 border-b">
+      <label className="block text-sm font-medium text-gray-700 mb-2">
+        序号设置
+      </label>
 
-      <div className="grid grid-cols-2 gap-2">
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">前缀</label>
-          <input
-            type="text"
-            value={ruleConfig.prefix}
-            onChange={(e) => handlePrefixChange(e.target.value)}
-            placeholder="前缀"
-            className="w-full px-2 py-1.5 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-          />
-        </div>
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">后缀</label>
-          <input
-            type="text"
-            value={ruleConfig.suffix}
-            onChange={(e) => handleSuffixChange(e.target.value)}
-            placeholder="后缀"
-            className="w-full px-2 py-1.5 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-          />
-        </div>
+      <div className="mb-2">
+        <label className="block text-xs text-gray-500 mb-1">序号类型</label>
+        <select
+          value={ruleConfig.numberType}
+          onChange={(e) => handleNumberTypeChange(e.target.value as 'number' | 'lowerLetter' | 'upperLetter')}
+          className="w-full px-2 py-1.5 text-sm text-gray-900 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+        >
+          <option value="number">数字序号</option>
+          <option value="lowerLetter">小写字母序号</option>
+          <option value="upperLetter">大写字母序号</option>
+        </select>
       </div>
 
-      <div className="flex items-center gap-4">
-        <label className="flex items-center gap-1.5 text-sm">
-          <input
-            type="checkbox"
-            checked={ruleConfig.useLetter}
-            onChange={(e) => handleUseLetterChange(e.target.checked)}
-            className="rounded"
-          />
-          <span>字母序号</span>
-        </label>
-        {ruleConfig.useLetter && (
-          <label className="flex items-center gap-1.5 text-sm">
-            <input
-              type="checkbox"
-              checked={ruleConfig.letterUppercase}
-              onChange={(e) => handleLetterUppercaseChange(e.target.checked)}
-              className="rounded"
-            />
-            <span>大写</span>
-          </label>
-        )}
-      </div>
-
-      {!ruleConfig.useLetter && (
-        <div className="grid grid-cols-3 gap-2">
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">起始值</label>
+      <div className="grid grid-cols-3 gap-2">
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">起始值</label>
+          {ruleConfig.numberType === 'number' ? (
             <input
               type="number"
-              value={ruleConfig.numberStart}
-              onChange={(e) => handleNumberStartChange(parseInt(e.target.value))}
+              value={ruleConfig.numberStart as number}
+              onChange={(e) => handleNumberStartChange(e.target.value)}
               min={0}
-              className="w-full px-2 py-1.5 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full px-2 py-1.5 text-sm text-gray-900 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
             />
-          </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">步长</label>
+          ) : (
             <input
-              type="number"
-              value={ruleConfig.numberStep}
-              onChange={(e) => handleNumberStepChange(parseInt(e.target.value))}
-              min={1}
-              className="w-full px-2 py-1.5 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+              type="text"
+              value={ruleConfig.numberStart as string}
+              onChange={(e) => handleNumberStartChange(e.target.value)}
+              maxLength={1}
+              className="w-full px-2 py-1.5 text-sm text-gray-900 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
             />
-          </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">位数</label>
+          )}
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">步长</label>
+          <input
+            type="number"
+            value={ruleConfig.numberStep}
+            onChange={(e) => handleNumberStepChange(parseInt(e.target.value))}
+            min={1}
+            className="w-full px-2 py-1.5 text-sm text-gray-900 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">位数</label>
+          <input
+            type="number"
+            value={ruleConfig.numberDigits}
+            onChange={(e) => handleNumberDigitsChange(parseInt(e.target.value))}
+            min={1}
+            max={10}
+            className="w-full px-2 py-1.5 text-sm text-gray-900 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ExtensionInput() {
+  const { ruleConfig, setRuleConfig } = useRuleStore()
+  const { logInput } = useActionLogger({ module: 'RulePanel', componentName: 'ExtensionInput' })
+
+  const handleSuffixChange = useCallback((value: string) => {
+    logInput('文件拓展名', value)
+    setRuleConfig({ suffix: value })
+  }, [setRuleConfig, logInput])
+
+  return (
+    <div className="p-3 border-b">
+      <label className="block text-sm font-medium text-gray-700 mb-2">
+        文件拓展名
+      </label>
+      <input
+        type="text"
+        value={ruleConfig.suffix}
+        onChange={(e) => handleSuffixChange(e.target.value)}
+        className="w-full px-3 py-2 text-sm text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+      />
+      <p className="mt-1 text-xs text-gray-400">
+        拓展名将添加在文件名和原拓展名之间
+      </p>
+    </div>
+  )
+}
+
+function CustomRuleInput() {
+  const { ruleConfig, setRuleConfig } = useRuleStore()
+  const { logInput } = useActionLogger({ module: 'RulePanel', componentName: 'CustomRuleInput' })
+
+  const handlePatternChange = useCallback((value: string) => {
+    logInput('自定义规则', value.length > 30 ? `${value.substring(0, 30)}...` : value)
+    setRuleConfig({ pattern: value })
+  }, [setRuleConfig, logInput])
+
+  return (
+    <div className="p-3 border-b">
+      <label className="block text-sm font-medium text-gray-700 mb-2">
+        自定义规则
+      </label>
+      <textarea
+        value={ruleConfig.pattern}
+        onChange={(e) => handlePatternChange(e.target.value)}
+        placeholder="例如：{$n%04}-{$f}{$ext}"
+        rows={3}
+        className="w-full px-3 py-2 text-sm text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none bg-white"
+      />
+      <p className="mt-1 text-xs text-gray-400">
+        留空则使用序号和拓展名设置
+      </p>
+    </div>
+  )
+}
+
+function TagView() {
+  const [tags, setTags] = useState<Tag[]>([])
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [newTagName, setNewTagName] = useState('')
+  const [newTagColor, setNewTagColor] = useState('#3b82f6')
+  const { logClick, logAction } = useActionLogger({ module: 'RulePanel', componentName: 'TagView' })
+  const { setRuleConfig, ruleConfig } = useRuleStore()
+
+  useEffect(() => {
+    setTags(tagManager.getAll())
+  }, [])
+
+  const handleAddTag = useCallback(() => {
+    if (newTagName.trim()) {
+      const tag = tagManager.add({
+        name: newTagName.trim(),
+        color: newTagColor,
+      })
+      setTags(tagManager.getAll())
+      setNewTagName('')
+      setShowAddForm(false)
+      logAction({
+        actionType: 'create',
+        message: '添加标签',
+        data: { tag },
+      })
+    }
+  }, [newTagName, newTagColor, logAction])
+
+  const handleDeleteTag = useCallback((id: string) => {
+    tagManager.delete(id)
+    setTags(tagManager.getAll())
+    logAction({
+      actionType: 'delete',
+      message: '删除标签',
+      data: { tagId: id },
+    })
+  }, [logAction])
+
+  const handleInsertTag = useCallback((tag: Tag) => {
+    const newPattern = ruleConfig.pattern + `[${tag.name}]`
+    setRuleConfig({ pattern: newPattern })
+    logClick('插入标签', { tagName: tag.name })
+  }, [ruleConfig.pattern, setRuleConfig, logClick])
+
+  return (
+    <div className="p-3 border-b">
+      <div className="flex items-center justify-between mb-2">
+        <label className="text-sm font-medium text-gray-700">标签管理</label>
+        <button
+          onClick={() => setShowAddForm(!showAddForm)}
+          className="text-xs text-blue-500 hover:text-blue-600"
+        >
+          {showAddForm ? '取消' : '+ 添加标签'}
+        </button>
+      </div>
+
+      {showAddForm && (
+        <div className="mb-3 p-2 bg-gray-50 rounded-lg space-y-2">
+          <div className="flex gap-2">
             <input
-              type="number"
-              value={ruleConfig.numberDigits}
-              onChange={(e) => handleNumberDigitsChange(parseInt(e.target.value))}
-              min={1}
-              max={10}
-              className="w-full px-2 py-1.5 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+              type="text"
+              value={newTagName}
+              onChange={(e) => setNewTagName(e.target.value)}
+              placeholder="标签名称"
+              className="flex-1 px-2 py-1 text-sm text-gray-900 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+            />
+            <input
+              type="color"
+              value={newTagColor}
+              onChange={(e) => setNewTagColor(e.target.value)}
+              className="w-8 h-8 rounded cursor-pointer"
             />
           </div>
+          <button
+            onClick={handleAddTag}
+            disabled={!newTagName.trim()}
+            className="w-full px-3 py-1.5 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            添加
+          </button>
         </div>
       )}
+
+      <div className="flex flex-wrap gap-2">
+        {tags.map((tag) => (
+          <div
+            key={tag.id}
+            className="flex items-center gap-1 px-2 py-1 rounded-full text-xs"
+            style={{ backgroundColor: tag.color + '20', color: tag.color }}
+          >
+            <button
+              onClick={() => handleInsertTag(tag)}
+              className="hover:opacity-70"
+              title="点击插入到规则"
+            >
+              {tag.name}
+            </button>
+            <button
+              onClick={() => handleDeleteTag(tag.id)}
+              className="ml-1 hover:opacity-70"
+              title="删除标签"
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+        {tags.length === 0 && (
+          <span className="text-xs text-gray-400">暂无标签</span>
+        )}
+      </div>
     </div>
   )
 }
@@ -362,8 +477,10 @@ export function RulePanel() {
       </div>
 
       <div className="overflow-auto flex-1">
-        <RuleInput />
-        <QuickRuleSettings />
+        <NumberInput />
+        <ExtensionInput />
+        <CustomRuleInput />
+        <TagView />
         <HelpPanel />
         <PreviewList />
       </div>

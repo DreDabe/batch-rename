@@ -1,37 +1,27 @@
-import { contextBridge, ipcRenderer } from 'electron'
+const { contextBridge, ipcRenderer } = require('electron');
 
-export const electronAPI = {
-  // File System
+console.log('[preload.ts] preload 脚本开始加载');
+
+const electronAPI = {
   fs: {
-    readDirectory: (dirPath: string) => ipcRenderer.invoke('fs:readDirectory', dirPath),
-    rename: (oldPath: string, newPath: string) => ipcRenderer.invoke('fs:rename', oldPath, newPath),
-    delete: (pathToDelete: string, recursive?: boolean) =>
-      ipcRenderer.invoke('fs:delete', pathToDelete, recursive),
-    createFolder: (parentPath: string, name: string) =>
-      ipcRenderer.invoke('fs:createFolder', parentPath, name),
-    copy: (source: string, destination: string) =>
-      ipcRenderer.invoke('fs:copy', source, destination),
-    move: (source: string, destination: string) =>
-      ipcRenderer.invoke('fs:move', source, destination),
-    exists: (targetPath: string) => ipcRenderer.invoke('fs:exists', targetPath),
-    readFile: (targetPath: string, maxSize?: number) =>
-      ipcRenderer.invoke('fs:readFile', targetPath, maxSize),
-    readImageBase64: (targetPath: string) =>
-      ipcRenderer.invoke('fs:readImageBase64', targetPath),
+    readDirectory: (dirPath) => ipcRenderer.invoke('fs:readDirectory', dirPath),
+    rename: (oldPath, newPath) => ipcRenderer.invoke('fs:rename', oldPath, newPath),
+    delete: (pathToDelete, recursive) => ipcRenderer.invoke('fs:delete', pathToDelete, recursive),
+    createFolder: (parentPath, name) => ipcRenderer.invoke('fs:createFolder', parentPath, name),
+    copy: (source, destination) => ipcRenderer.invoke('fs:copy', source, destination),
+    move: (source, destination) => ipcRenderer.invoke('fs:move', source, destination),
+    exists: (targetPath) => ipcRenderer.invoke('fs:exists', targetPath),
+    readFile: (targetPath, maxSize) => ipcRenderer.invoke('fs:readFile', targetPath, maxSize),
+    readImageBase64: (targetPath) => ipcRenderer.invoke('fs:readImageBase64', targetPath),
+    getDrives: () => ipcRenderer.invoke('fs:getDrives'),
+    hasChildren: (dirPath) => ipcRenderer.invoke('fs:hasChildren', dirPath),
   },
 
-  // Dialog
   dialog: {
     openDirectory: () => ipcRenderer.invoke('dialog:openDirectory'),
-    showMessage: (options: {
-      type: 'none' | 'info' | 'error' | 'question' | 'warning'
-      title: string
-      message: string
-      buttons?: string[]
-    }) => ipcRenderer.invoke('dialog:showMessage', options),
+    showMessage: (options) => ipcRenderer.invoke('dialog:showMessage', options),
   },
 
-  // History
   history: {
     undo: () => ipcRenderer.invoke('history:undo'),
     getHistory: () => ipcRenderer.invoke('history:getHistory'),
@@ -39,20 +29,27 @@ export const electronAPI = {
     clear: () => ipcRenderer.invoke('history:clear'),
   },
 
-  // Config
   config: {
     load: () => ipcRenderer.invoke('config:load'),
     get: () => ipcRenderer.invoke('config:get'),
-    update: (key: string, value: unknown) => ipcRenderer.invoke('config:update', key, value),
-    addFavorite: (path: string) => ipcRenderer.invoke('config:addFavorite', path),
-    removeFavorite: (path: string) => ipcRenderer.invoke('config:removeFavorite', path),
+    update: (key, value) => ipcRenderer.invoke('config:update', key, value),
+    addFavorite: (path) => ipcRenderer.invoke('config:addFavorite', path),
+    removeFavorite: (path) => ipcRenderer.invoke('config:removeFavorite', path),
   },
 
-  // Version
   version: {
     checkUpdate: () => ipcRenderer.invoke('version:checkUpdate'),
     current: () => ipcRenderer.invoke('version:current'),
   },
+};
+
+console.log('[preload.ts] electronAPI 对象创建完成:', Object.keys(electronAPI));
+
+try {
+  contextBridge.exposeInMainWorld('electronAPI', electronAPI);
+  console.log('[preload.ts] electronAPI 已成功暴露到 window 对象');
+} catch (error) {
+  console.error('[preload.ts] 暴露 electronAPI 时出错:', error);
 }
 
-contextBridge.exposeInMainWorld('electronAPI', electronAPI)
+console.log('[preload.ts] preload 脚本加载完成');

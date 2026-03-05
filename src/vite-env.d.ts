@@ -12,6 +12,16 @@ interface FileSystemAPI {
   exists: (targetPath: string) => Promise<boolean>
   readFile: (targetPath: string, maxSize?: number) => Promise<OperationResult<string>>
   readImageBase64: (targetPath: string) => Promise<OperationResult<string>>
+  getDrives: () => Promise<OperationResult<DriveInfo[]>>
+  hasChildren: (dirPath: string) => Promise<boolean>
+}
+
+interface DriveInfo {
+  name: string
+  path: string
+  type: 'fixed' | 'removable' | 'network' | 'cdrom' | 'unknown'
+  size?: number
+  freeSpace?: number
 }
 
 interface DialogAPI {

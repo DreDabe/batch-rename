@@ -193,7 +193,7 @@ class Logger {
 
     this.saveLogs()
 
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.DEV) {
       this.consoleLog(level, module, message, sanitizedData)
     }
   }
@@ -305,7 +305,7 @@ class Logger {
 
     this.userPath.push(`${params.module}:${params.actionType}`)
 
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.DEV) {
       this.consoleActionLog(entry)
     }
   }

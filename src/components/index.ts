@@ -1,6 +1,7 @@
 export { FileList } from './FileList'
 export { FileListToolbar } from './FileListToolbar'
-export { FavoritesPanel } from './FavoritesPanel'
+export { TreePanel } from './TreePanel'
+export { ResizablePanel } from './ResizablePanel'
 export { FilePreview, PreviewPanel } from './FilePreview'
 export { RulePanel } from './RulePanel'
 export { TopMenuBar } from './TopMenuBar'
