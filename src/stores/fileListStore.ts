@@ -94,7 +94,6 @@ export const useFileListStore = create<FileListState>((set, get) => ({
       previousState: { count: prevFiles.length },
       newState: { count: files.length },
     })
-    log.debug(`设置文件列表，共 ${files.length} 个文件`)
     set({ files, selectedFiles: new Set(), previewFile: null, lastSelectedIndex: -1 })
   },
   setPreviewFile: (file) => {
@@ -136,7 +135,6 @@ export const useFileListStore = create<FileListState>((set, get) => ({
     })
   },
   setLoading: (isLoading) => {
-    log.debug(`加载状态: ${isLoading}`)
     set({ isLoading })
   },
   setError: (error) => {

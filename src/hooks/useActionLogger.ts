@@ -39,25 +39,9 @@ export function useActionLogger(options: UseActionLoggerOptions) {
   const idRef = useRef(componentId || `${componentName}-${Date.now()}`)
 
   useEffect(() => {
-    const currentId = idRef.current
-    logger.logAction({
-      module,
-      componentId: currentId,
-      componentName,
-      actionType: 'load',
-      message: `组件加载: ${componentName}`,
-      level: 'debug',
-    })
-
+    // 组件加载时不需要调试日志
     return () => {
-      logger.logAction({
-        module,
-        componentId: currentId,
-        componentName,
-        actionType: 'navigate',
-        message: `组件卸载: ${componentName}`,
-        level: 'debug',
-      })
+      // 组件卸载时不需要调试日志
     }
   }, [module, componentName])
 

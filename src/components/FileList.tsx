@@ -212,33 +212,24 @@ export function FileList() {
   const files = getFilteredAndSortedFiles()
 
   const handleGoBack = useCallback(() => {
-    const path = goBack()
-    if (path) {
-      log.info(`返回到路径: ${path}`)
-    }
+    goBack()
   }, [goBack])
 
   const handleGoForward = useCallback(() => {
-    const path = goForward()
-    if (path) {
-      log.info(`前进到路径: ${path}`)
-    }
+    goForward()
   }, [goForward])
 
   const handleCopy = useCallback(() => {
     copySelected()
-    log.info(`复制了 ${selectedFiles.size} 个文件`)
-  }, [copySelected, selectedFiles.size])
+  }, [copySelected])
 
   const handleCut = useCallback(() => {
     cutSelected()
-    log.info(`剪切了 ${selectedFiles.size} 个文件`)
-  }, [cutSelected, selectedFiles.size])
+  }, [cutSelected])
 
   const handlePaste = useCallback(async () => {
     const success = await paste()
     if (success) {
-      log.info('粘贴成功')
       // 重新加载文件列表
       if (currentPath) {
         const result = await window.electronAPI.fs.readDirectory(currentPath)
@@ -246,15 +237,12 @@ export function FileList() {
           setFiles(result.data.files)
         }
       }
-    } else {
-      log.error('粘贴失败')
     }
   }, [paste, currentPath, setFiles])
 
   const handleUndo = useCallback(async () => {
     const result = await window.electronAPI.history.undo()
     if (result.success) {
-      log.info('撤销成功')
       // 重新加载文件列表
       if (currentPath) {
         const reloadResult = await window.electronAPI.fs.readDirectory(currentPath)
@@ -262,8 +250,6 @@ export function FileList() {
           setFiles(reloadResult.data.files)
         }
       }
-    } else {
-      log.error('撤销失败')
     }
   }, [currentPath, setFiles])
 
@@ -299,42 +285,33 @@ export function FileList() {
     setTimeout(() => {
       document.body.removeChild(dragImage)
     }, 0)
-    
-    log.info(`开始拖拽文件: ${file.path}`)
   }, [])
 
   const handleDragEnd = useCallback(() => {
-    log.info('拖拽结束')
   }, [])
 
-  const handleDragOver = useCallback((_e: React.DragEvent, folderPath: string) => {
-    log.info(`拖拽经过文件夹: ${folderPath}`)
+  const handleDragOver = useCallback((_e: React.DragEvent, _folderPath: string) => {
   }, [])
 
   const handleDrop = useCallback(async (e: React.DragEvent, folderPath: string) => {
     const filePath = e.dataTransfer.getData('text/plain')
     if (!filePath) return
     
-    log.info(`将文件 ${filePath} 拖拽到文件夹 ${folderPath}`)
-    
     try {
       // 检查是否拖拽到自身
       if (filePath === folderPath) {
-        log.warn('不能将文件拖拽到自身')
         return
       }
       
       // 检查是否拖拽到父级目录
       const fileDir = filePath.substring(0, filePath.lastIndexOf('\\'))
       if (fileDir === folderPath) {
-        log.warn('不能将文件拖拽到父级目录')
         return
       }
       
       // 执行移动操作
       const result = await window.electronAPI.fs.move(filePath, folderPath)
       if (result.success) {
-        log.info(`文件移动成功: ${filePath} -> ${folderPath}`)
         // 重新加载文件列表
         if (currentPath) {
           const reloadResult = await window.electronAPI.fs.readDirectory(currentPath)
@@ -342,11 +319,9 @@ export function FileList() {
             setFiles(reloadResult.data.files)
           }
         }
-      } else {
-        log.error(`文件移动失败: ${result.error}`)
       }
     } catch (err) {
-      log.error(`移动文件时出错: ${err instanceof Error ? err.message : '未知错误'}`)
+      // 忽略错误，由fileSystemService处理
     }
   }, [currentPath, setFiles])
 
@@ -357,21 +332,17 @@ export function FileList() {
         return
       }
 
-      log.info(`开始加载目录: ${currentPath}`)
       setLoading(true)
       setError(null)
 
       try {
         const result = await window.electronAPI.fs.readDirectory(currentPath)
         if (result.success && result.data) {
-          log.info(`加载成功，共 ${result.data.files.length} 个文件`)
           setFiles(result.data.files)
         } else {
-          log.error(`加载失败: ${result.error}`)
           setError(result.error || '读取目录失败')
         }
       } catch (err) {
-        log.error(`加载异常: ${err instanceof Error ? err.message : '未知错误'}`)
         setError(err instanceof Error ? err.message : '未知错误')
       } finally {
         setLoading(false)

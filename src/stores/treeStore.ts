@@ -4,13 +4,6 @@ import type { DriveInfo, FileItem } from '../types'
 
 const log = createModuleLogger('TreeStore')
 
-const debugLog = (message: string, data?: unknown) => {
-  log.info(message, data)
-  if (window.electronAPI?.debug?.log) {
-    window.electronAPI.debug.log(`[TreeStore] ${message}`, data)
-  }
-}
-
 export interface TreeNode {
   id: string
   name: string
@@ -68,7 +61,6 @@ export const useTreeStore = create<TreeState>((set, get) => ({
   isPanelCollapsed: false,
 
   initializeTree: async () => {
-    debugLog('初始化目录树')
     set({ isLoading: true, error: null })
 
     try {
@@ -79,7 +71,6 @@ export const useTreeStore = create<TreeState>((set, get) => ({
       }
 
       const drives: DriveInfo[] = result.data
-      debugLog(`获取到 ${drives.length} 个驱动器`, drives.map(d => d.path))
 
       const rootNode: TreeNode = {
         id: 'root',
@@ -104,10 +95,8 @@ export const useTreeStore = create<TreeState>((set, get) => ({
       }
 
       set({ rootNode, isLoading: false })
-      debugLog('目录树初始化完成')
     } catch (error) {
       const errMsg = error instanceof Error ? error.message : '未知错误'
-      debugLog(`初始化失败: ${errMsg}`)
       set({ 
         error: errMsg,
         isLoading: false 
@@ -118,8 +107,6 @@ export const useTreeStore = create<TreeState>((set, get) => ({
   loadNodeChildren: async (nodeId: string, nodePath: string) => {
     const { rootNode } = get()
     if (!rootNode) return
-
-    debugLog(`加载节点子目录`, { nodeId, nodePath })
 
     const updateNodeLoading = (node: TreeNode, targetId: string, loading: boolean): TreeNode => {
       if (node.id === targetId) {
@@ -177,7 +164,6 @@ export const useTreeStore = create<TreeState>((set, get) => ({
             icon: '📁',
           })
         } catch {
-          debugLog(`检查目录 "${folder.name}" 是否有子目录失败，假设为空目录`)
           children.push({
             id: folder.path,
             name: folder.name,
@@ -209,8 +195,6 @@ export const useTreeStore = create<TreeState>((set, get) => ({
         rootNode: updateNodeChildren(get().rootNode!, nodeId, children),
         expandedPaths: new Set([...state.expandedPaths, nodeId])
       }))
-
-      debugLog(`加载完成，共 ${children.length} 个子目录`, { nodeId, expandedPaths: Array.from(get().expandedPaths) })
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : '未知错误'
       const userFriendlyError = errorMessage.includes('EPERM') 
@@ -219,15 +203,12 @@ export const useTreeStore = create<TreeState>((set, get) => ({
         ? '目录不存在'
         : `加载目录失败：${errorMessage}`
       
-      debugLog(`加载子目录失败: ${errorMessage}`)
       set({ rootNode: updateNodeError(get().rootNode!, nodeId, userFriendlyError) })
     }
   },
 
   toggleNode: async (nodeId: string, nodePath: string) => {
     const { expandedPaths, rootNode } = get()
-    
-    debugLog(`toggleNode 被调用`, { nodeId, nodePath, currentExpanded: expandedPaths.has(nodeId) })
     
     const findNode = (node: TreeNode, targetId: string): TreeNode | null => {
       if (node.id === targetId) return node
@@ -242,7 +223,6 @@ export const useTreeStore = create<TreeState>((set, get) => ({
 
     const node = rootNode ? findNode(rootNode, nodeId) : null
     if (!node) {
-      debugLog(`toggleNode: 未找到节点`, { nodeId })
       return
     }
 
@@ -250,32 +230,25 @@ export const useTreeStore = create<TreeState>((set, get) => ({
       const newExpanded = new Set(expandedPaths)
       newExpanded.delete(nodeId)
       set({ expandedPaths: newExpanded })
-      debugLog(`节点已折叠`, { nodeId, expandedPaths: Array.from(newExpanded) })
     } else {
       if (node.children === null && node.hasChildren) {
-        debugLog(`节点需要加载子目录`, { nodeId })
         await get().loadNodeChildren(nodeId, nodePath)
       } else {
         set(state => ({
           expandedPaths: new Set([...state.expandedPaths, nodeId])
         }))
-        debugLog(`节点已展开`, { nodeId, expandedPaths: Array.from(get().expandedPaths) })
       }
     }
   },
 
   selectNode: (path: string | null) => {
-    debugLog(`选中节点: ${path || '无'}`)
     set({ selectedPath: path })
   },
 
   expandToPath: async (targetPath: string) => {
-    debugLog('expandToPath 被调用', { targetPath })
-    
     const { rootNode, loadNodeChildren } = get()
     
     if (!rootNode) {
-      debugLog('rootNode 为空，无法展开')
       return
     }
 
@@ -283,20 +256,15 @@ export const useTreeStore = create<TreeState>((set, get) => ({
     set(state => ({
       expandedPaths: new Set([...state.expandedPaths, 'root'])
     }))
-    debugLog('已将根节点加入 expandedPaths')
 
     const normalizePath = (path: string): string => {
       return path.replace(/\\/g, '/').toLowerCase().replace(/\/$/, '')
     }
 
     const normalizedTarget = normalizePath(targetPath)
-    debugLog('标准化目标路径', { normalizedTarget })
 
     const expandPath = async (node: TreeNode, remainingParts: string[], currentPath: string) => {
-      debugLog('expandPath', { currentPath, remainingParts, nodeId: node.id })
-      
       if (remainingParts.length === 0) {
-        debugLog('已到达目标路径，设置 selectedPath', { targetPath })
         set(() => ({
           selectedPath: targetPath
         }))
@@ -306,12 +274,8 @@ export const useTreeStore = create<TreeState>((set, get) => ({
       const nextPart = remainingParts[0]
       const nextPath = currentPath ? `${currentPath}\\${nextPart}` : nextPart
 
-      debugLog('尝试加载节点子目录', { nodeId: node.id, nodePath: node.path, hasChildren: node.hasChildren, childrenNull: node.children === null })
-      
       if (node.children === null && node.hasChildren) {
-        debugLog('调用 loadNodeChildren', { nodeId: node.id, nodePath: node.path || currentPath })
         await loadNodeChildren(node.id, node.path || currentPath)
-        debugLog('loadNodeChildren 完成', { nodeId: node.id })
       }
 
       const updatedState = get()
@@ -327,63 +291,37 @@ export const useTreeStore = create<TreeState>((set, get) => ({
       }
 
       const updatedNode = findUpdatedNode(updatedState.rootNode!, node.id)
-      debugLog('获取更新后的节点', { 
-        nodeId: node.id, 
-        found: !!updatedNode, 
-        childrenCount: updatedNode?.children?.length 
-      })
       
       if (updatedNode?.children) {
-        debugLog(`节点有 ${updatedNode.children.length} 个子节点`)
         for (const child of updatedNode.children) {
           const childPathNormalized = normalizePath(child.path)
           const nextPathNormalized = normalizePath(nextPath)
           
-          debugLog('比较路径', { 
-            childPath: childPathNormalized, 
-            nextPath: nextPathNormalized, 
-            childName: child.name, 
-            nextPart,
-            match: childPathNormalized === nextPathNormalized || child.name.toLowerCase() === nextPart.toLowerCase()
-          })
-          
           if (childPathNormalized === nextPathNormalized || child.name.toLowerCase() === nextPart.toLowerCase()) {
-            debugLog('找到匹配节点', { childName: child.name, childPath: child.path })
             set(state => ({
               expandedPaths: new Set([...state.expandedPaths, child.id])
             }))
-            debugLog('已将节点加入 expandedPaths', { childId: child.id, expandedPaths: Array.from(get().expandedPaths) })
             await expandPath(child, remainingParts.slice(1), nextPath)
             return
           }
         }
-        debugLog('未找到匹配的子节点', { nextPart })
       }
     }
 
-    debugLog('驱动器列表', { drives: rootNode.children?.map(d => ({ name: d.name, path: d.path })) })
     for (const drive of rootNode.children || []) {
       const drivePathNormalized = normalizePath(drive.path)
-      debugLog('检查驱动器', { drivePath: drive.path, drivePathNormalized })
       
       if (normalizedTarget === drivePathNormalized || normalizedTarget.startsWith(drivePathNormalized + '/')) {
-        debugLog('找到匹配驱动器', { driveName: drive.name, drivePath: drive.path })
         set(state => ({
           expandedPaths: new Set([...state.expandedPaths, drive.id])
         }))
         
         const relativePath = targetPath.slice(drive.path.length)
         const parts = relativePath.split(/[/\\]/).filter(Boolean)
-        debugLog('相对路径部分', { parts, drivePath: drive.path })
         await expandPath(drive, parts, drive.path)
         break
       }
     }
-    
-    debugLog('expandToPath 完成', { 
-      selectedPath: get().selectedPath, 
-      expandedPaths: Array.from(get().expandedPaths) 
-    })
   },
 
   setPanelWidth: (width: number) => {

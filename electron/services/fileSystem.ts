@@ -35,7 +35,7 @@ export class FileSystemService {
             extension: entry.isFile() ? path.extname(entry.name).toLowerCase() : '',
           })
         } catch (statError) {
-          console.log(`[fileSystem] 跳过无法访问的文件: ${fullPath}`, statError instanceof Error ? statError.message : 'Unknown error')
+          // 跳过无法访问的文件
         }
       }
 
