@@ -6,6 +6,16 @@ import { logService } from '../services/logger'
 import { versionService } from '../services/version'
 
 export function registerIpcHandlers(): void {
+  // Debug logging
+  ipcMain.on('debug:log', (_event, message: string, data?: unknown) => {
+    const timestamp = new Date().toISOString()
+    if (data !== undefined) {
+      console.log(`[${timestamp}] ${message}`, JSON.stringify(data, null, 2))
+    } else {
+      console.log(`[${timestamp}] ${message}`)
+    }
+  })
+
   // File System Operations
   ipcMain.handle('fs:readDirectory', async (_event, dirPath: string) => {
     return fileSystemService.readDirectory(dirPath)
@@ -143,6 +153,10 @@ export function registerIpcHandlers(): void {
     return { success: true }
   })
 
+  ipcMain.handle('history:recordOperation', async (_event, operation: string, params: any, rollbackInfo: any) => {
+    return historyService.recordOperation(operation, params, rollbackInfo)
+  })
+
   // Config Operations
   ipcMain.handle('config:load', async () => {
     return configService.load()
@@ -152,7 +166,7 @@ export function registerIpcHandlers(): void {
     return configService.get()
   })
 
-  ipcMain.handle('config:update', async (_event, key: string, value: unknown) => {
+  ipcMain.handle('config:update', async (_event, key: string, value: string | string[] | undefined) => {
     return configService.update(key as keyof ReturnType<typeof configService.get>, value)
   })
 

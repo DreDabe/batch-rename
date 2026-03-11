@@ -17,6 +17,7 @@ export type ActionType =
   | 'shortcut'
   | 'error'
   | 'state_change'
+  | 'preview'
 
 export interface ActionLogEntry {
   timestamp: string
@@ -106,6 +107,7 @@ const ActionTypeLabels: Record<ActionType, string> = {
   shortcut: '⌨️ 快捷键',
   error: '❌ 错误',
   state_change: '📊 状态变更',
+  preview: '👁️ 预览',
 }
 
 class Logger {

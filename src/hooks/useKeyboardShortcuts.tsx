@@ -22,6 +22,10 @@ export function useKeyboardShortcuts() {
   const setFiles = useFileListStore((state) => state.setFiles)
   const setLoading = useFileListStore((state) => state.setLoading)
   const setError = useFileListStore((state) => state.setError)
+  const copySelected = useFileListStore((state) => state.copySelected)
+  const cutSelected = useFileListStore((state) => state.cutSelected)
+  const paste = useFileListStore((state) => state.paste)
+  const hasClipboardFiles = useFileListStore((state) => state.hasClipboardFiles)
   const previews = useRuleStore((state) => state.previews)
   const clearPreviews = useRuleStore((state) => state.clearPreviews)
 
@@ -105,14 +109,38 @@ export function useKeyboardShortcuts() {
     }
   }, [previews, currentPath, setFiles, clearPreviews])
 
+  const handleCopy = useCallback(() => {
+    log.info('快捷键: Ctrl+C 复制')
+    copySelected()
+  }, [copySelected])
+
+  const handleCut = useCallback(() => {
+    log.info('快捷键: Ctrl+X 剪切')
+    cutSelected()
+  }, [cutSelected])
+
+  const handlePaste = useCallback(async () => {
+    log.info('快捷键: Ctrl+V 粘贴')
+    const success = await paste()
+    if (success && currentPath) {
+      const result = await window.electronAPI.fs.readDirectory(currentPath)
+      if (result.success && result.data) {
+        setFiles(result.data.files)
+      }
+    }
+  }, [paste, currentPath, setFiles])
+
   const shortcuts: KeyboardShortcut[] = useMemo(() => [
     { key: 'o', ctrlKey: true, action: handleOpenDirectory, description: '打开目录' },
     { key: 'a', ctrlKey: true, action: handleSelectAll, description: '全选' },
+    { key: 'c', ctrlKey: true, action: handleCopy, description: '复制' },
+    { key: 'x', ctrlKey: true, action: handleCut, description: '剪切' },
+    { key: 'v', ctrlKey: true, action: handlePaste, description: '粘贴' },
     { key: 'z', ctrlKey: true, action: handleUndo, description: '撤销' },
     { key: 'Delete', action: handleDelete, description: '删除' },
     { key: 'F5', action: handleRefresh, description: '刷新' },
     { key: 'Enter', ctrlKey: true, action: handleExecuteRename, description: '执行重命名' },
-  ], [handleOpenDirectory, handleSelectAll, handleUndo, handleDelete, handleRefresh, handleExecuteRename])
+  ], [handleOpenDirectory, handleSelectAll, handleCopy, handleCut, handlePaste, handleUndo, handleDelete, handleRefresh, handleExecuteRename])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -120,11 +148,15 @@ export function useKeyboardShortcuts() {
         return
       }
 
+      log.debug(`键盘事件: key=${e.key}, ctrlKey=${e.ctrlKey}, shiftKey=${e.shiftKey}, altKey=${e.altKey}`)
+
       for (const shortcut of shortcuts) {
         const keyMatch = e.key.toLowerCase() === shortcut.key.toLowerCase() || e.key === shortcut.key
         const ctrlMatch = shortcut.ctrlKey ? e.ctrlKey || e.metaKey : !e.ctrlKey && !e.metaKey
         const shiftMatch = shortcut.shiftKey ? e.shiftKey : !e.shiftKey
         const altMatch = shortcut.altKey ? e.altKey : !e.altKey
+
+        log.debug(`检查快捷键: ${shortcut.description}, 匹配: key=${keyMatch}, ctrl=${ctrlMatch}, shift=${shiftMatch}, alt=${altMatch}`)
 
         if (keyMatch && ctrlMatch && shiftMatch && altMatch) {
           e.preventDefault()
@@ -146,6 +178,9 @@ export function ShortcutHelp() {
   const shortcuts = [
     { keys: 'Ctrl+O', description: '打开目录' },
     { keys: 'Ctrl+A', description: '全选' },
+    { keys: 'Ctrl+C', description: '复制' },
+    { keys: 'Ctrl+X', description: '剪切' },
+    { keys: 'Ctrl+V', description: '粘贴' },
     { keys: 'Ctrl+Z', description: '撤销' },
     { keys: 'Delete', description: '删除选中' },
     { keys: 'F5', description: '刷新列表' },

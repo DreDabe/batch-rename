@@ -63,12 +63,17 @@ interface VersionAPI {
   current: () => Promise<string>
 }
 
+interface DebugAPI {
+  log: (message: string, data?: unknown) => void
+}
+
 interface ElectronAPI {
   fs: FileSystemAPI
   dialog: DialogAPI
   history: HistoryAPI
   config: ConfigAPI
   version: VersionAPI
+  debug: DebugAPI
 }
 
 declare global {

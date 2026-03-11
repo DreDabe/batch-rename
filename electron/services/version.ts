@@ -31,7 +31,7 @@ export class VersionService {
     return app.getVersion()
   }
 
-  async checkForUpdate(): Promise<OperationResult<VersionInfo>> {
+  async checkForUpdate(): Promise<OperationResult> {
     try {
       const response = await fetch(
         `https://api.github.com/repos/${this.repoOwner}/${this.repoName}/releases/latest`,

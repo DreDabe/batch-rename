@@ -12,9 +12,12 @@ export type FileFilter = {
   value: string
 }
 
+export type ClipboardOperation = 'copy' | 'cut' | null
+
 interface FileListState {
   files: FileItem[]
   selectedFiles: Set<string>
+  previewFile: FileItem | null
   currentPath: string | null
   isLoading: boolean
   error: string | null
@@ -23,12 +26,17 @@ interface FileListState {
   filters: FileFilter[]
   lastSelectedIndex: number
   searchQuery: string
+  pathHistory: string[]
+  currentPathIndex: number
+  clipboardFiles: string[]
+  clipboardOperation: ClipboardOperation
 
   setFiles: (files: FileItem[]) => void
   setCurrentPath: (path: string | null) => void
   setLoading: (loading: boolean) => void
   setError: (error: string | null) => void
   selectFile: (path: string, index: number, isCtrl: boolean, isShift: boolean) => void
+  setPreviewFile: (file: FileItem | null) => void
   selectAll: () => void
   deselectAll: () => void
   toggleSelect: (path: string) => void
@@ -39,6 +47,14 @@ interface FileListState {
   setSearchQuery: (query: string) => void
   getFilteredAndSortedFiles: () => FileItem[]
   getSelectedFiles: () => FileItem[]
+  canGoBack: () => boolean
+  canGoForward: () => boolean
+  goBack: () => string | null
+  goForward: () => string | null
+  copySelected: () => void
+  cutSelected: () => void
+  paste: () => Promise<boolean>
+  hasClipboardFiles: () => boolean
 }
 
 const getFileExtension = (filename: string): string => {
@@ -57,14 +73,19 @@ const formatFileSize = (bytes: number): string => {
 export const useFileListStore = create<FileListState>((set, get) => ({
   files: [],
   selectedFiles: new Set<string>(),
+  previewFile: null,
   currentPath: null,
   isLoading: false,
   error: null,
-  sortField: 'name',
+  sortField: 'extension',
   sortOrder: 'asc',
   filters: [],
   lastSelectedIndex: -1,
   searchQuery: '',
+  pathHistory: [],
+  currentPathIndex: -1,
+  clipboardFiles: [],
+  clipboardOperation: null,
 
   setFiles: (files) => {
     const prevFiles = get().files
@@ -74,10 +95,20 @@ export const useFileListStore = create<FileListState>((set, get) => ({
       newState: { count: files.length },
     })
     log.debug(`设置文件列表，共 ${files.length} 个文件`)
-    set({ files, selectedFiles: new Set(), lastSelectedIndex: -1 })
+    set({ files, selectedFiles: new Set(), previewFile: null, lastSelectedIndex: -1 })
+  },
+  setPreviewFile: (file) => {
+    log.logAction({
+      actionType: 'preview',
+      message: `设置预览文件`,
+      data: { file: file?.name || null },
+    })
+    set({ previewFile: file })
   },
   setCurrentPath: (path) => {
     const prevPath = get().currentPath
+    const { pathHistory, currentPathIndex } = get()
+    
     log.logAction({
       actionType: 'navigate',
       message: `切换目录`,
@@ -85,7 +116,24 @@ export const useFileListStore = create<FileListState>((set, get) => ({
       newState: { path },
       data: { from: prevPath, to: path },
     })
-    set({ currentPath: path })
+    
+    if (path === null) {
+      set({ currentPath: path })
+      return
+    }
+    
+    if (path === prevPath) {
+      return
+    }
+    
+    const newHistory = [...pathHistory.slice(0, currentPathIndex + 1), path]
+    const newIndex = newHistory.length - 1
+    
+    set({ 
+      currentPath: path,
+      pathHistory: newHistory,
+      currentPathIndex: newIndex
+    })
   },
   setLoading: (isLoading) => {
     log.debug(`加载状态: ${isLoading}`)
@@ -297,6 +345,174 @@ export const useFileListStore = create<FileListState>((set, get) => ({
   getSelectedFiles: () => {
     const { files, selectedFiles } = get()
     return files.filter((f) => selectedFiles.has(f.path))
+  },
+
+  canGoBack: () => {
+    const { currentPathIndex } = get()
+    return currentPathIndex > 0
+  },
+
+  canGoForward: () => {
+    const { currentPathIndex, pathHistory } = get()
+    return currentPathIndex < pathHistory.length - 1
+  },
+
+  goBack: () => {
+    const { currentPathIndex, pathHistory } = get()
+    if (currentPathIndex > 0) {
+      const newIndex = currentPathIndex - 1
+      const path = pathHistory[newIndex]
+      set({ 
+        currentPath: path,
+        currentPathIndex: newIndex
+      })
+      return path
+    }
+    return null
+  },
+
+  goForward: () => {
+    const { currentPathIndex, pathHistory } = get()
+    if (currentPathIndex < pathHistory.length - 1) {
+      const newIndex = currentPathIndex + 1
+      const path = pathHistory[newIndex]
+      set({ 
+        currentPath: path,
+        currentPathIndex: newIndex
+      })
+      return path
+    }
+    return null
+  },
+
+  copySelected: () => {
+    const { selectedFiles } = get()
+    const files = Array.from(selectedFiles)
+    log.logAction({
+      actionType: 'copy',
+      message: '复制文件到剪贴板',
+      data: { count: files.length },
+    })
+    set({ 
+      clipboardFiles: files,
+      clipboardOperation: 'copy'
+    })
+  },
+
+  cutSelected: () => {
+    const { selectedFiles } = get()
+    const files = Array.from(selectedFiles)
+    log.logAction({
+      actionType: 'cut',
+      message: '剪切文件到剪贴板',
+      data: { count: files.length },
+    })
+    set({ 
+      clipboardFiles: files,
+      clipboardOperation: 'cut'
+    })
+  },
+
+  paste: async () => {
+    const { clipboardFiles, clipboardOperation, currentPath } = get()
+    
+    if (!clipboardFiles.length || !clipboardOperation || !currentPath) {
+      return false
+    }
+
+    log.logAction({
+      actionType: 'paste',
+      message: `${clipboardOperation === 'copy' ? '复制' : '移动'}文件`,
+      data: { count: clipboardFiles.length, destination: currentPath },
+    })
+
+    let successCount = 0
+    let failCount = 0
+    const operations: { type: 'copy' | 'move'; source: string; destination: string }[] = []
+
+    for (const filePath of clipboardFiles) {
+      try {
+        const fileName = filePath.substring(filePath.lastIndexOf('\\') + 1)
+        const destFilePath = currentPath + '\\' + fileName
+        
+        if (clipboardOperation === 'copy') {
+          const result = await window.electronAPI.fs.copy(filePath, currentPath)
+          if (result.success) {
+            successCount++
+            operations.push({ type: 'copy', source: filePath, destination: destFilePath })
+          } else {
+            failCount++
+            log.logError({
+              message: '复制文件失败',
+              data: { file: filePath, error: result.error },
+            })
+          }
+        } else if (clipboardOperation === 'cut') {
+          const result = await window.electronAPI.fs.move(filePath, currentPath)
+          if (result.success) {
+            successCount++
+            operations.push({ type: 'move', source: filePath, destination: destFilePath })
+          } else {
+            failCount++
+            log.logError({
+              message: '移动文件失败',
+              data: { file: filePath, error: result.error },
+            })
+          }
+        }
+      } catch (err) {
+        failCount++
+        log.logError({
+          message: '粘贴操作异常',
+          error: err,
+          data: { file: filePath },
+        })
+      }
+    }
+
+    // 记录操作到历史记录
+    if (operations.length > 0) {
+      for (const op of operations) {
+        if (op.type === 'move') {
+          await window.electronAPI.history.recordOperation('move', {
+            source: op.source,
+            destination: op.destination,
+          }, {
+            type: 'move',
+            originalPath: op.source,
+            newPath: op.destination,
+          })
+        } else if (op.type === 'copy') {
+          await window.electronAPI.history.recordOperation('copy', {
+            source: op.source,
+            destination: op.destination,
+          }, {
+            type: 'create',
+            newPath: op.destination,
+          })
+        }
+      }
+    }
+
+    if (clipboardOperation === 'cut') {
+      set({ 
+        clipboardFiles: [],
+        clipboardOperation: null
+      })
+    }
+
+    log.logAction({
+      actionType: 'paste',
+      message: '粘贴操作完成',
+      data: { successCount, failCount },
+    })
+
+    return failCount === 0
+  },
+
+  hasClipboardFiles: () => {
+    const { clipboardFiles, clipboardOperation } = get()
+    return clipboardFiles.length > 0 && clipboardOperation !== null
   },
 }))
 

@@ -26,6 +26,7 @@ const ACTION_TYPE_LABELS: Record<ActionType, string> = {
   shortcut: '⌨️ 快捷键',
   error: '❌ 错误',
   state_change: '📊 状态变更',
+  preview: '👁️ 预览',
 }
 
 interface LogViewerProps {

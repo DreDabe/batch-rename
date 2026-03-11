@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import type { FileItem } from '../types'
 import { getFileIcon, getFileCategory } from '../utils/fileIcons'
 import { useFileListStore } from '../stores/fileListStore'
@@ -29,11 +29,13 @@ function ImagePreview({ src }: { src: string }) {
 
 function VideoPreview({ path }: { path: string }) {
   return (
-    <div className="flex items-center justify-center h-full p-4 bg-gray-900">
+    <div className="flex items-center justify-center h-full w-full p-4 bg-gray-900">
       <video
-        src={`file://${path}`}
+        src={`file:///${path.replace(/\\/g, '/')}`}
         controls
-        className="max-w-full max-h-full rounded"
+        autoPlay
+        className="w-full h-full object-contain"
+        style={{ maxWidth: '100%', maxHeight: '100%' }}
       />
     </div>
   )
@@ -43,7 +45,7 @@ function AudioPreview({ path }: { path: string }) {
   return (
     <div className="flex flex-col items-center justify-center h-full p-4 bg-gray-50">
       <span className="text-6xl mb-4">🎵</span>
-      <audio src={`file://${path}`} controls className="w-full max-w-md" />
+      <audio src={`file:///${path.replace(/\\/g, '/')}`} controls className="w-full max-w-md" />
     </div>
   )
 }
@@ -95,19 +97,26 @@ export function FilePreview({ file }: PreviewProps) {
   const [imageSrc, setImageSrc] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const currentFilePathRef = useRef<string | null>(null)
 
   const category = useMemo(() => {
     if (!file) return null
     return getFileCategory(file.name, file.isDirectory)
-  }, [file])
+  }, [file?.name, file?.isDirectory])
 
   useEffect(() => {
     if (!file || file.isDirectory) {
       setContent(null)
       setImageSrc(null)
+      currentFilePathRef.current = null
       return
     }
 
+    if (currentFilePathRef.current === file.path) {
+      return
+    }
+
+    currentFilePathRef.current = file.path
     setLoading(true)
     setError(null)
     setContent(null)
@@ -196,20 +205,19 @@ export function FilePreview({ file }: PreviewProps) {
 }
 
 export function PreviewPanel() {
-  const selectedFiles = useFileListStore((state) => state.getSelectedFiles())
-  const selectedFile = selectedFiles.length === 1 ? selectedFiles[0] : null
+  const previewFile = useFileListStore((state) => state.previewFile)
 
   return (
     <div className="h-full flex flex-col bg-white">
       <div className="flex-1 overflow-hidden">
-        <FilePreview file={selectedFile} />
+        <FilePreview file={previewFile} />
       </div>
-      {selectedFile && (
+      {previewFile && (
         <div className="px-3 py-2 text-xs text-gray-500 border-t bg-gray-50">
           <div className="flex justify-between">
-            <span className="truncate">{selectedFile.name}</span>
+            <span className="truncate">{previewFile.name}</span>
             <span className="ml-2 flex-shrink-0">
-              {selectedFile.isDirectory ? '文件夹' : `${selectedFile.size} 字节`}
+              {previewFile.isDirectory ? '文件夹' : `${previewFile.size} 字节`}
             </span>
           </div>
         </div>

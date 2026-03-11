@@ -6,7 +6,7 @@ import { createModuleLogger } from '../utils/logger'
 
 const log = createModuleLogger('RuleStore')
 
-export type NumberType = 'number' | 'lowerLetter' | 'upperLetter'
+export type NumberType = 'none' | 'number' | 'lowerLetter' | 'upperLetter'
 
 export interface RuleConfig {
   pattern: string
@@ -35,7 +35,7 @@ interface RuleState {
 
 const DEFAULT_RULE_CONFIG: RuleConfig = {
   pattern: '',
-  numberType: 'number',
+  numberType: 'none',
   numberStart: 1,
   numberStep: 1,
   numberDigits: 4,
@@ -66,7 +66,30 @@ export const useRuleStore = create<RuleState>((set, get) => ({
   },
 
   generatePreviews: (files) => {
-    const pattern = get().getPatternString()
+    const { ruleConfig } = get()
+    let pattern = get().getPatternString()
+
+    // 如果用户使用了自定义规则且规则中没有包含{$ext}，则添加文件扩展名处理
+    if (ruleConfig.pattern && !ruleConfig.pattern.includes('{$ext}')) {
+      if (ruleConfig.suffix === '*') {
+        // 当文件扩展名是*时，添加{$ext}以保持原始扩展名
+        pattern = ruleConfig.pattern + '{$ext}'
+      } else if (ruleConfig.suffix) {
+        // 当文件扩展名是具体值时，智能添加扩展名
+        // 检查自定义规则是否以点号结尾
+        const endsWithDot = ruleConfig.pattern.endsWith('.')
+        // 移除后缀可能包含的点号，统一处理
+        const cleanSuffix = ruleConfig.suffix.replace(/^\./, '')
+        
+        if (endsWithDot) {
+          // 规则以点号结尾，直接拼接后缀
+          pattern = ruleConfig.pattern + cleanSuffix
+        } else {
+          // 规则不以点号结尾，添加点号和后缀
+          pattern = ruleConfig.pattern + '.' + cleanSuffix
+        }
+      }
+    }
 
     log.logAction({
       actionType: 'load',
@@ -190,15 +213,17 @@ export const useRuleStore = create<RuleState>((set, get) => ({
       parts.push('{$l}')
     } else if (ruleConfig.numberType === 'upperLetter') {
       parts.push('{$L}')
-    } else {
+    } else if (ruleConfig.numberType === 'number') {
       const digits = ruleConfig.numberDigits
       parts.push(`{$n%0${digits}}`)
     }
 
     parts.push('{$f}')
 
-    if (ruleConfig.suffix) {
-      parts.push(ruleConfig.suffix)
+    if (ruleConfig.suffix && ruleConfig.suffix !== '*') {
+      // 移除后缀可能包含的点号，统一处理
+      const cleanSuffix = ruleConfig.suffix.replace(/^\./, '')
+      parts.push('.' + cleanSuffix)
     }
 
     parts.push('{$ext}')

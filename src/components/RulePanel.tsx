@@ -1,25 +1,52 @@
-import { useState, useEffect, useCallback } from 'react'
-import { useRuleStore } from '../stores/ruleStore'
+import { useCallback, useMemo, useState, useEffect, useRef } from 'react'
+import { useRuleStore, type RuleConfig } from '../stores/ruleStore'
 import { useFileListStore } from '../stores/fileListStore'
-import { getFileIcon } from '../utils/fileIcons'
+import { getFileIcon, getFileTypeLabel } from '../utils/fileIcons'
 import { useActionLogger } from '../hooks/useActionLogger'
 import { tagManager } from '../utils/tagManager'
+import { Tooltip } from './Tooltip'
 import type { RenamePreview, Tag } from '../types/rules'
 
 function NumberInput() {
   const { ruleConfig, setRuleConfig } = useRuleStore()
   const { logInput, logSelect } = useActionLogger({ module: 'RulePanel', componentName: 'NumberInput' })
 
-  const handleNumberTypeChange = useCallback((type: 'number' | 'lowerLetter' | 'upperLetter') => {
+  const getNumberExpression = useCallback((type: 'none' | 'number' | 'lowerLetter' | 'upperLetter', digits: number) => {
+    if (type === 'none') return ''
+    if (type === 'lowerLetter') return '{$l}'
+    if (type === 'upperLetter') return '{$L}'
+    return `{$n%0${digits}}`
+  }, [])
+
+  const handleNumberTypeChange = useCallback((type: 'none' | 'number' | 'lowerLetter' | 'upperLetter') => {
     logSelect('序号类型', type)
-    if (type === 'number') {
-      setRuleConfig({ numberType: type, numberStart: 1 })
-    } else if (type === 'lowerLetter') {
-      setRuleConfig({ numberType: type, numberStart: 'a' })
-    } else {
-      setRuleConfig({ numberType: type, numberStart: 'A' })
+    
+    const prevType = ruleConfig.numberType
+    const prevExpr = getNumberExpression(prevType, ruleConfig.numberDigits)
+    const newExpr = getNumberExpression(type, ruleConfig.numberDigits)
+    
+    let newPattern = ruleConfig.pattern
+    
+    if (prevType !== 'none' && prevExpr) {
+      newPattern = newPattern.replace(prevExpr, '')
     }
-  }, [setRuleConfig, logSelect])
+    
+    if (type === 'none') {
+      setRuleConfig({ numberType: type, pattern: newPattern.trim() || '{$f}' })
+    } else {
+      const startValue = type === 'number' ? 1 : (type === 'lowerLetter' ? 'a' : 'A')
+      
+      if (newPattern.includes('{$f}')) {
+        newPattern = newPattern.replace('{$f}', `${newExpr}{$f}`)
+      } else if (newPattern.trim() === '') {
+        newPattern = `${newExpr}{$f}`
+      } else {
+        newPattern = newExpr + newPattern
+      }
+      
+      setRuleConfig({ numberType: type, numberStart: startValue, pattern: newPattern })
+    }
+  }, [setRuleConfig, logSelect, ruleConfig, getNumberExpression])
 
   const handleNumberStartChange = useCallback((value: string) => {
     logInput('起始值', value)
@@ -50,85 +77,163 @@ function NumberInput() {
         <label className="block text-xs text-gray-500 mb-1">序号类型</label>
         <select
           value={ruleConfig.numberType}
-          onChange={(e) => handleNumberTypeChange(e.target.value as 'number' | 'lowerLetter' | 'upperLetter')}
+          onChange={(e) => handleNumberTypeChange(e.target.value as 'none' | 'number' | 'lowerLetter' | 'upperLetter')}
           className="w-full px-2 py-1.5 text-sm text-gray-900 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
         >
+          <option value="none">无</option>
           <option value="number">数字序号</option>
           <option value="lowerLetter">小写字母序号</option>
           <option value="upperLetter">大写字母序号</option>
         </select>
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">起始值</label>
-          {ruleConfig.numberType === 'number' ? (
+      {ruleConfig.numberType !== 'none' && (
+        <div className="grid grid-cols-3 gap-2">
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">起始值</label>
+            {ruleConfig.numberType === 'number' ? (
+              <input
+                type="number"
+                value={ruleConfig.numberStart as number}
+                onChange={(e) => handleNumberStartChange(e.target.value)}
+                min={0}
+                className="w-full px-2 py-1.5 text-sm text-gray-900 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+              />
+            ) : (
+              <input
+                type="text"
+                value={ruleConfig.numberStart as string}
+                onChange={(e) => handleNumberStartChange(e.target.value)}
+                maxLength={1}
+                className="w-full px-2 py-1.5 text-sm text-gray-900 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+              />
+            )}
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">步长</label>
             <input
               type="number"
-              value={ruleConfig.numberStart as number}
-              onChange={(e) => handleNumberStartChange(e.target.value)}
-              min={0}
+              value={ruleConfig.numberStep}
+              onChange={(e) => handleNumberStepChange(parseInt(e.target.value))}
+              min={1}
               className="w-full px-2 py-1.5 text-sm text-gray-900 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
             />
-          ) : (
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">位数</label>
             <input
-              type="text"
-              value={ruleConfig.numberStart as string}
-              onChange={(e) => handleNumberStartChange(e.target.value)}
-              maxLength={1}
+              type="number"
+              value={ruleConfig.numberDigits}
+              onChange={(e) => handleNumberDigitsChange(parseInt(e.target.value))}
+              min={1}
+              max={10}
               className="w-full px-2 py-1.5 text-sm text-gray-900 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
             />
-          )}
+          </div>
         </div>
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">步长</label>
-          <input
-            type="number"
-            value={ruleConfig.numberStep}
-            onChange={(e) => handleNumberStepChange(parseInt(e.target.value))}
-            min={1}
-            className="w-full px-2 py-1.5 text-sm text-gray-900 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
-          />
-        </div>
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">位数</label>
-          <input
-            type="number"
-            value={ruleConfig.numberDigits}
-            onChange={(e) => handleNumberDigitsChange(parseInt(e.target.value))}
-            min={1}
-            max={10}
-            className="w-full px-2 py-1.5 text-sm text-gray-900 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
-          />
-        </div>
-      </div>
+      )}
     </div>
   )
 }
 
 function ExtensionInput() {
   const { ruleConfig, setRuleConfig } = useRuleStore()
+  const selectedFiles = useFileListStore((state) => state.getSelectedFiles())
   const { logInput } = useActionLogger({ module: 'RulePanel', componentName: 'ExtensionInput' })
+  const [showDropdown, setShowDropdown] = useState(false)
+
+  // 常用文件扩展名列表
+  const commonExtensions = [
+    'txt', 'pdf', 'jpg', 'png', 'docx', 'xlsx', 'pptx', 'md', 'json', 'csv',
+    'js', 'ts', 'jsx', 'tsx', 'html', 'css', 'scss', 'svg', 'mp3', 'mp4'
+  ]
+
+  const getExtensionDisplay = useCallback((files: typeof selectedFiles): string => {
+    if (files.length === 0) return ''
+    if (files.length === 1) {
+      const ext = files[0].extension || ''
+      // 移除点号，统一显示格式
+      return ext.replace(/^\./, '')
+    }
+    const extensions = new Set(files.map(f => f.extension.replace(/^\./, '') || ''))
+    if (extensions.size === 1) {
+      return Array.from(extensions)[0]
+    }
+    return '*'
+  }, [])
+
+  const autoExtension = useMemo(() => getExtensionDisplay(selectedFiles), [selectedFiles, getExtensionDisplay])
+
+  useEffect(() => {
+    // 只在选择文件变化时自动填充，不覆盖用户手动输入
+    if (selectedFiles.length > 0 && autoExtension !== ruleConfig.suffix) {
+      setRuleConfig({ suffix: autoExtension })
+    }
+  }, [autoExtension, selectedFiles.length, setRuleConfig])
 
   const handleSuffixChange = useCallback((value: string) => {
     logInput('文件拓展名', value)
     setRuleConfig({ suffix: value })
   }, [setRuleConfig, logInput])
 
+  const handleExtensionSelect = useCallback((extension: string) => {
+    // 移除点号，统一存储格式
+    const cleanExtension = extension.replace(/^\./, '')
+    logInput('文件拓展名', cleanExtension)
+    setRuleConfig({ suffix: cleanExtension })
+    setShowDropdown(false)
+  }, [setRuleConfig, logInput])
+
+  const handleClickOutside = useCallback((event: MouseEvent) => {
+    const target = event.target as HTMLElement
+    if (!target.closest('.extension-input-container')) {
+      setShowDropdown(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [handleClickOutside])
+
   return (
     <div className="p-3 border-b">
       <label className="block text-sm font-medium text-gray-700 mb-2">
         文件拓展名
       </label>
-      <input
-        type="text"
-        value={ruleConfig.suffix}
-        onChange={(e) => handleSuffixChange(e.target.value)}
-        className="w-full px-3 py-2 text-sm text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-      />
-      <p className="mt-1 text-xs text-gray-400">
-        拓展名将添加在文件名和原拓展名之间
-      </p>
+      <div className="relative extension-input-container">
+        <input
+          type="text"
+          value={ruleConfig.suffix}
+          onChange={(e) => handleSuffixChange(e.target.value)}
+          placeholder="自动填充或输入扩展名"
+          className="w-full px-3 py-2 text-sm text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white pr-10"
+        />
+        <button
+          type="button"
+          onClick={() => setShowDropdown(!showDropdown)}
+          className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+        >
+          ▼
+        </button>
+        {showDropdown && (
+          <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto z-10">
+            <div className="p-2">
+              {commonExtensions.map((ext) => (
+                <div
+                  key={ext}
+                  className="px-3 py-1.5 text-sm text-gray-900 hover:bg-gray-100 cursor-pointer rounded"
+                  onClick={() => handleExtensionSelect(ext)}
+                >
+                  .{ext}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -141,6 +246,17 @@ function CustomRuleInput() {
     logInput('自定义规则', value.length > 30 ? `${value.substring(0, 30)}...` : value)
     setRuleConfig({ pattern: value })
   }, [setRuleConfig, logInput])
+
+  const displayPattern = useMemo(() => {
+    if (!ruleConfig.pattern) return ''
+    if (ruleConfig.suffix === '*') {
+      return ruleConfig.pattern.replace(/\{\$ext\}/g, '*')
+    }
+    if (ruleConfig.suffix) {
+      return ruleConfig.pattern.replace(/\{\$ext\}/g, `.${ruleConfig.suffix}`)
+    }
+    return ruleConfig.pattern
+  }, [ruleConfig.pattern, ruleConfig.suffix])
 
   return (
     <div className="p-3 border-b">
@@ -155,7 +271,7 @@ function CustomRuleInput() {
         className="w-full px-3 py-2 text-sm text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none bg-white"
       />
       <p className="mt-1 text-xs text-gray-400">
-        留空则使用序号和拓展名设置
+        预览效果: {displayPattern || '(未设置)'}
       </p>
     </div>
   )
@@ -325,27 +441,37 @@ function HelpPanel() {
 
 function PreviewItem({ preview, index }: { preview: RenamePreview; index: number }) {
   const icon = getFileIcon(preview.newName, false)
+  const typeLabel = getFileTypeLabel(preview.newName, false)
 
   return (
     <div
-      className={`flex items-center gap-2 px-3 py-2 text-sm border-b ${
+      className={`flex items-start gap-2 px-3 py-1.5 text-sm border-b select-none ${
         preview.hasConflict ? 'bg-red-50' : index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
       }`}
     >
-      <span className="text-lg">{icon}</span>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="text-gray-400 truncate max-w-[40%]">{preview.originalName}</span>
-          <span className="text-gray-300">→</span>
-          <span className={`truncate ${preview.hasConflict ? 'text-red-500' : 'text-green-600'}`}>
-            {preview.newName}
-          </span>
+      <span className="text-lg flex-shrink-0 mt-0.5">{icon}</span>
+      <div className="flex-1 min-w-0 flex flex-col">
+        <div className="flex items-center justify-between min-w-0">
+          <div className="flex items-center gap-1 min-w-0 flex-1">
+            <Tooltip content={preview.originalName}>
+              <span className="text-gray-400 truncate max-w-[40%]">{preview.originalName}</span>
+            </Tooltip>
+            <span className="text-gray-300 flex-shrink-0">→</span>
+            <Tooltip content={preview.newName}>
+              <span className={`truncate min-w-0 flex-1 ${preview.hasConflict ? 'text-red-500' : 'text-green-600'}`}>
+                {preview.newName}
+              </span>
+            </Tooltip>
+          </div>
         </div>
-        {preview.hasConflict && (
-          <p className="text-xs text-red-400 mt-0.5">
-            {preview.conflictType === 'duplicate' ? '文件名冲突' : '非法文件名'}
-          </p>
-        )}
+        <div className="flex items-center justify-between mt-0.5">
+          <span className="text-xs text-gray-500">{typeLabel}</span>
+          {preview.hasConflict && (
+            <span className="text-xs text-red-400">
+              {preview.conflictType === 'duplicate' ? '文件名冲突' : '非法文件名'}
+            </span>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -388,7 +514,8 @@ function PreviewList() {
 }
 
 function ActionButtons() {
-  const { previews, isExecuting, executeRename, clearPreviews } = useRuleStore()
+  const { previews, isExecuting, executeRename, clearPreviews, setRuleConfig } = useRuleStore()
+  const { deselectAll, getSelectedFiles } = useFileListStore()
   const { logClick, logAction, logError } = useActionLogger({ module: 'RulePanel', componentName: 'ActionButtons' })
   const conflictCount = previews.filter((p) => p.hasConflict).length
   const canExecute = previews.length > 0 && conflictCount === 0
@@ -396,7 +523,30 @@ function ActionButtons() {
   const handleClear = useCallback(() => {
     logClick('清空按钮', { previewCount: previews.length })
     clearPreviews()
-  }, [clearPreviews, previews.length, logClick])
+    deselectAll()
+    setRuleConfig({ pattern: '', numberType: 'none', suffix: '' })
+  }, [clearPreviews, deselectAll, previews.length, logClick, setRuleConfig])
+
+  const handleReset = useCallback(() => {
+    logClick('恢复按钮')
+    const selectedFiles = getSelectedFiles()
+    const extensions = new Set(selectedFiles.map(f => f.extension || ''))
+    const autoExtension = selectedFiles.length === 0 
+      ? '' 
+      : selectedFiles.length === 1 
+        ? selectedFiles[0].extension || ''
+        : extensions.size === 1 
+          ? Array.from(extensions)[0] 
+          : '*'
+    
+    setRuleConfig({ 
+      pattern: '{$f}', 
+      numberType: 'none',
+      suffix: autoExtension
+    })
+  }, [getSelectedFiles, logClick, setRuleConfig])
+
+  const [showSuccessAlert, setShowSuccessAlert] = useState(true)
 
   const handleExecute = useCallback(async () => {
     logClick('执行重命名按钮', { previewCount: previews.length })
@@ -414,8 +564,32 @@ function ActionButtons() {
           message: '重命名执行成功',
           data: { success: result.success, failed: result.failed },
         })
-        alert(`成功重命名 ${result.success} 个文件`)
+        
+        if (showSuccessAlert) {
+          const dialogResult = await window.electronAPI.dialog.showMessage({
+            type: 'info',
+            title: 'batch-rename',
+            message: `成功重命名 ${result.success} 个文件`,
+            buttons: ['确定'],
+            checkboxLabel: '本次运行不再弹出',
+            checkboxChecked: false
+          })
+          
+          if (dialogResult.checkboxChecked) {
+            setShowSuccessAlert(false)
+          }
+        }
+        
         clearPreviews()
+        
+        // 重新加载文件列表
+        const currentPath = useFileListStore.getState().currentPath
+        if (currentPath) {
+          const reloadResult = await window.electronAPI.fs.readDirectory(currentPath)
+          if (reloadResult.success && reloadResult.data) {
+            useFileListStore.getState().setFiles(reloadResult.data.files)
+          }
+        }
       } else {
         logError({
           message: '重命名执行失败',
@@ -428,10 +602,16 @@ function ActionButtons() {
         error: err,
       })
     }
-  }, [executeRename, clearPreviews, previews.length, logClick, logAction, logError])
+  }, [executeRename, clearPreviews, previews.length, logClick, logAction, logError, showSuccessAlert])
 
   return (
     <div className="p-3 border-t bg-gray-50 flex gap-2">
+      <button
+        onClick={handleReset}
+        className="px-3 py-2 text-sm text-gray-600 bg-white border rounded-lg hover:bg-gray-50"
+      >
+        恢复
+      </button>
       <button
         onClick={handleClear}
         className="flex-1 px-3 py-2 text-sm text-gray-600 bg-white border rounded-lg hover:bg-gray-50 disabled:opacity-50"
@@ -452,20 +632,50 @@ function ActionButtons() {
 
 export function RulePanel() {
   const selectedFiles = useFileListStore((state) => state.getSelectedFiles())
+  const selectedFilesPaths = useFileListStore((state) => Array.from(state.selectedFiles).sort())
   const generatePreviews = useRuleStore((state) => state.generatePreviews)
-  const ruleConfig = useRuleStore((state) => state.ruleConfig)
+  const clearPreviews = useRuleStore((state) => state.clearPreviews)
+  const { ruleConfig, setRuleConfig } = useRuleStore()
   const { logAction } = useActionLogger({ module: 'RulePanel', componentName: 'RulePanel' })
+  const lastProcessedPathsRef = useRef<string>('')
+  const lastRuleConfigRef = useRef<RuleConfig>(ruleConfig)
 
   useEffect(() => {
+    const currentPathsKey = selectedFilesPaths.join(',')
+    if (currentPathsKey === lastProcessedPathsRef.current) {
+      return
+    }
+
+    lastProcessedPathsRef.current = currentPathsKey
+
     if (selectedFiles.length > 0) {
       logAction({
         actionType: 'load',
         message: '生成重命名预览',
         data: { fileCount: selectedFiles.length },
       })
+      
+      if (!ruleConfig.pattern || ruleConfig.pattern.trim() === '') {
+        setRuleConfig({ pattern: '{$f}' })
+      }
+      
+      generatePreviews(selectedFiles)
+    } else {
+      clearPreviews()
+      setRuleConfig({ pattern: '', numberType: 'none', suffix: '' })
+    }
+  }, [selectedFilesPaths, selectedFiles, generatePreviews, clearPreviews, logAction, ruleConfig.pattern, setRuleConfig])
+
+  // 监听规则配置变化，重新生成预览
+  useEffect(() => {
+    // 比较 ruleConfig 是否真正变化
+    const isRuleConfigChanged = JSON.stringify(ruleConfig) !== JSON.stringify(lastRuleConfigRef.current)
+    
+    if (isRuleConfigChanged && selectedFiles.length > 0) {
+      lastRuleConfigRef.current = { ...ruleConfig }
       generatePreviews(selectedFiles)
     }
-  }, [selectedFiles, ruleConfig, generatePreviews, logAction])
+  }, [ruleConfig, selectedFiles, generatePreviews])
 
   return (
     <div className="h-full flex flex-col bg-white">

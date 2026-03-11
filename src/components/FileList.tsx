@@ -2,23 +2,43 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useFileListStore, formatFileSize } from '../stores/fileListStore'
 import { getFileIcon, getFileTypeLabel } from '../utils/fileIcons'
 import { createModuleLogger } from '../utils/logger'
+import { Tooltip } from './Tooltip'
+import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import type { FileItem } from '../types'
 
 const log = createModuleLogger('FileList')
 
-const ITEM_HEIGHT = 40
+const ITEM_HEIGHT = 56
 const OVERSCAN = 5
 
 interface VirtualListProps {
   items: FileItem[]
   itemHeight: number
-  containerHeight: number
   renderItem: (item: FileItem, index: number) => React.ReactNode
 }
 
-function VirtualList({ items, itemHeight, containerHeight, renderItem }: VirtualListProps) {
+function VirtualList({ items, itemHeight, renderItem }: VirtualListProps) {
   const [scrollTop, setScrollTop] = useState(0)
+  const [containerHeight, setContainerHeight] = useState(600)
   const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!containerRef.current) return
+    
+    const updateHeight = () => {
+      const height = containerRef.current!.clientHeight
+      if (height > 0) {
+        setContainerHeight(height)
+      }
+    }
+    
+    updateHeight()
+    
+    const resizeObserver = new ResizeObserver(updateHeight)
+    resizeObserver.observe(containerRef.current)
+    
+    return () => resizeObserver.disconnect()
+  }, [])
 
   const totalHeight = items.length * itemHeight
   const startIndex = Math.max(0, Math.floor(scrollTop / itemHeight) - OVERSCAN)
@@ -40,7 +60,26 @@ function VirtualList({ items, itemHeight, containerHeight, renderItem }: Virtual
       ref={containerRef}
       className="overflow-auto h-full"
       onScroll={handleScroll}
+      style={{
+        scrollbarWidth: 'thin',
+        scrollbarColor: '#cbd5e1 #f1f5f9',
+      }}
     >
+      <style>{`
+        .overflow-auto::-webkit-scrollbar {
+          width: 8px;
+        }
+        .overflow-auto::-webkit-scrollbar-track {
+          background: #f1f5f9;
+        }
+        .overflow-auto::-webkit-scrollbar-thumb {
+          background-color: #cbd5e1;
+          border-radius: 4px;
+        }
+        .overflow-auto::-webkit-scrollbar-thumb:hover {
+          background-color: #94a3b8;
+        }
+      `}</style>
       <div style={{ height: totalHeight, position: 'relative' }}>
         {visibleItems.map(({ item, index }) => (
           <div
@@ -66,38 +105,88 @@ interface FileListItemProps {
   index: number
   isSelected: boolean
   onSelect: (path: string, index: number, isCtrl: boolean, isShift: boolean) => void
+  onDoubleClick: (file: FileItem) => void
+  onDragStart: (e: React.DragEvent, file: FileItem) => void
+  onDragEnd: (e: React.DragEvent) => void
+  onDragOver: (e: React.DragEvent, folderPath: string) => void
+  onDrop: (e: React.DragEvent, folderPath: string) => void
 }
 
-function FileListItem({ file, index, isSelected, onSelect }: FileListItemProps) {
+function FileListItem({ file, index, isSelected, onSelect, onDoubleClick, onDragStart, onDragEnd, onDragOver, onDrop }: FileListItemProps) {
+  const [isDragOver, setIsDragOver] = useState(false)
+
   const handleClick = useCallback((e: React.MouseEvent) => {
     onSelect(file.path, index, e.ctrlKey || e.metaKey, e.shiftKey)
   }, [file.path, index, onSelect])
+
+  const handleDoubleClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    onDoubleClick(file)
+  }, [file, onDoubleClick])
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    if (file.isDirectory) {
+      e.preventDefault()
+      e.dataTransfer.dropEffect = 'move'
+      setIsDragOver(true)
+      onDragOver(e, file.path)
+    }
+  }, [file.isDirectory, file.path, onDragOver])
+
+  const handleDragLeave = useCallback(() => {
+    setIsDragOver(false)
+  }, [])
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(false)
+    if (file.isDirectory) {
+      onDrop(e, file.path)
+    }
+  }, [file.isDirectory, file.path, onDrop])
 
   const icon = getFileIcon(file.name, file.isDirectory)
   const typeLabel = getFileTypeLabel(file.name, file.isDirectory)
 
   return (
     <div
-      className={`flex items-center px-3 py-2 cursor-pointer border-b border-gray-100 transition-colors ${
+      className={`flex items-start px-3 py-1.5 cursor-pointer border-b border-gray-100 transition-colors select-none ${ 
         isSelected
           ? 'bg-blue-50 border-l-2 border-l-blue-500'
+          : isDragOver && file.isDirectory
+          ? 'bg-green-50 border-l-2 border-l-green-500'
           : 'hover:bg-gray-50 border-l-2 border-l-transparent'
       }`}
       onClick={handleClick}
+      onDoubleClick={handleDoubleClick}
+      draggable={!file.isDirectory} // 只允许文件拖拽，不允许文件夹拖拽
+      onDragStart={(e) => onDragStart(e, file)}
+      onDragEnd={onDragEnd}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
     >
-      <span className="text-xl mr-3 flex-shrink-0">{icon}</span>
-      <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium text-gray-900 truncate">{file.name}</div>
-        <div className="text-xs text-gray-500">{typeLabel}</div>
-      </div>
-      <div className="text-xs text-gray-400 ml-2 flex-shrink-0">
-        {file.isDirectory ? '--' : formatFileSize(file.size)}
+      <span className="text-xl mr-3 flex-shrink-0 mt-0.5">{icon}</span>
+      <div className="flex-1 min-w-0 flex flex-col">
+        <div className="flex items-center justify-between">
+          <Tooltip content={file.name}>
+            <div className="text-sm font-medium text-gray-900 truncate flex-1 min-w-0">
+              {file.name}
+            </div>
+          </Tooltip>
+          <div className="text-xs text-gray-400 flex-shrink-0 whitespace-nowrap ml-2 w-16 text-right">
+            {file.isDirectory ? '--' : formatFileSize(file.size)}
+          </div>
+        </div>
+        <div className="text-xs text-gray-500 mt-0.5">{typeLabel}</div>
       </div>
     </div>
   )
 }
 
 export function FileList() {
+  useKeyboardShortcuts()
+  
   const {
     currentPath,
     isLoading,
@@ -107,10 +196,159 @@ export function FileList() {
     setLoading,
     setError,
     selectFile,
+    setPreviewFile,
     getFilteredAndSortedFiles,
+    setCurrentPath,
+    canGoBack,
+    canGoForward,
+    goBack,
+    goForward,
+    copySelected,
+    cutSelected,
+    paste,
+    hasClipboardFiles,
   } = useFileListStore()
 
   const files = getFilteredAndSortedFiles()
+
+  const handleGoBack = useCallback(() => {
+    const path = goBack()
+    if (path) {
+      log.info(`返回到路径: ${path}`)
+    }
+  }, [goBack])
+
+  const handleGoForward = useCallback(() => {
+    const path = goForward()
+    if (path) {
+      log.info(`前进到路径: ${path}`)
+    }
+  }, [goForward])
+
+  const handleCopy = useCallback(() => {
+    copySelected()
+    log.info(`复制了 ${selectedFiles.size} 个文件`)
+  }, [copySelected, selectedFiles.size])
+
+  const handleCut = useCallback(() => {
+    cutSelected()
+    log.info(`剪切了 ${selectedFiles.size} 个文件`)
+  }, [cutSelected, selectedFiles.size])
+
+  const handlePaste = useCallback(async () => {
+    const success = await paste()
+    if (success) {
+      log.info('粘贴成功')
+      // 重新加载文件列表
+      if (currentPath) {
+        const result = await window.electronAPI.fs.readDirectory(currentPath)
+        if (result.success && result.data) {
+          setFiles(result.data.files)
+        }
+      }
+    } else {
+      log.error('粘贴失败')
+    }
+  }, [paste, currentPath, setFiles])
+
+  const handleUndo = useCallback(async () => {
+    const result = await window.electronAPI.history.undo()
+    if (result.success) {
+      log.info('撤销成功')
+      // 重新加载文件列表
+      if (currentPath) {
+        const reloadResult = await window.electronAPI.fs.readDirectory(currentPath)
+        if (reloadResult.success && reloadResult.data) {
+          setFiles(reloadResult.data.files)
+        }
+      }
+    } else {
+      log.error('撤销失败')
+    }
+  }, [currentPath, setFiles])
+
+  const handleDoubleClick = useCallback((file: FileItem) => {
+    if (file.isDirectory) {
+      setCurrentPath(file.path)
+    } else {
+      setPreviewFile(file)
+    }
+  }, [setPreviewFile, setCurrentPath])
+
+  const handleDragStart = useCallback((e: React.DragEvent, file: FileItem) => {
+    if (file.isDirectory) return
+    
+    // 设置拖拽数据
+    e.dataTransfer.setData('text/plain', file.path)
+    e.dataTransfer.effectAllowed = 'move'
+    
+    // 添加拖拽视觉效果
+    const dragImage = document.createElement('div')
+    dragImage.className = 'bg-white p-2 rounded shadow-md border border-gray-200'
+    dragImage.innerHTML = `
+      <div class="flex items-center">
+        <span class="text-lg mr-2">${getFileIcon(file.name, false)}</span>
+        <span class="text-sm font-medium">${file.name}</span>
+      </div>
+    `
+    dragImage.style.position = 'absolute'
+    dragImage.style.left = '-9999px'
+    document.body.appendChild(dragImage)
+    e.dataTransfer.setDragImage(dragImage, 20, 20)
+    
+    setTimeout(() => {
+      document.body.removeChild(dragImage)
+    }, 0)
+    
+    log.info(`开始拖拽文件: ${file.path}`)
+  }, [])
+
+  const handleDragEnd = useCallback(() => {
+    log.info('拖拽结束')
+  }, [])
+
+  const handleDragOver = useCallback((_e: React.DragEvent, folderPath: string) => {
+    log.info(`拖拽经过文件夹: ${folderPath}`)
+  }, [])
+
+  const handleDrop = useCallback(async (e: React.DragEvent, folderPath: string) => {
+    const filePath = e.dataTransfer.getData('text/plain')
+    if (!filePath) return
+    
+    log.info(`将文件 ${filePath} 拖拽到文件夹 ${folderPath}`)
+    
+    try {
+      // 检查是否拖拽到自身
+      if (filePath === folderPath) {
+        log.warn('不能将文件拖拽到自身')
+        return
+      }
+      
+      // 检查是否拖拽到父级目录
+      const fileDir = filePath.substring(0, filePath.lastIndexOf('\\'))
+      if (fileDir === folderPath) {
+        log.warn('不能将文件拖拽到父级目录')
+        return
+      }
+      
+      // 执行移动操作
+      const result = await window.electronAPI.fs.move(filePath, folderPath)
+      if (result.success) {
+        log.info(`文件移动成功: ${filePath} -> ${folderPath}`)
+        // 重新加载文件列表
+        if (currentPath) {
+          const reloadResult = await window.electronAPI.fs.readDirectory(currentPath)
+          if (reloadResult.success && reloadResult.data) {
+            setFiles(reloadResult.data.files)
+          }
+        }
+      } else {
+        log.error(`文件移动失败: ${result.error}`)
+      }
+    } catch (err) {
+      log.error(`移动文件时出错: ${err instanceof Error ? err.message : '未知错误'}`)
+    }
+  }, [currentPath, setFiles])
 
   useEffect(() => {
     const loadFiles = async () => {
@@ -180,12 +418,64 @@ export function FileList() {
   }
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="flex-1">
+    <div className="h-full flex flex-col min-h-0">
+      <div className="flex items-center gap-1 px-3 py-2 border-b bg-gray-50 flex-shrink-0">
+        <button
+          onClick={handleGoBack}
+          disabled={!canGoBack()}
+          className="w-7 h-7 flex items-center justify-center text-gray-600 hover:bg-gray-200 rounded disabled:opacity-40 disabled:cursor-not-allowed"
+          title="返回"
+        >
+          ←
+        </button>
+        <button
+          onClick={handleGoForward}
+          disabled={!canGoForward()}
+          className="w-7 h-7 flex items-center justify-center text-gray-600 hover:bg-gray-200 rounded disabled:opacity-40 disabled:cursor-not-allowed"
+          title="前进"
+        >
+          →
+        </button>
+        <div className="w-px h-5 bg-gray-300 mx-1" />
+        <button
+          onClick={handleCopy}
+          disabled={selectedFiles.size === 0}
+          className="w-7 h-7 flex items-center justify-center text-gray-600 hover:bg-gray-200 rounded disabled:opacity-40 disabled:cursor-not-allowed"
+          title="复制"
+        >
+          📋
+        </button>
+        <button
+          onClick={handleCut}
+          disabled={selectedFiles.size === 0}
+          className="w-7 h-7 flex items-center justify-center text-gray-600 hover:bg-gray-200 rounded disabled:opacity-40 disabled:cursor-not-allowed"
+          title="剪切"
+        >
+          ✂️
+        </button>
+        <button
+          onClick={handlePaste}
+          disabled={!hasClipboardFiles()}
+          className="w-7 h-7 flex items-center justify-center text-gray-600 hover:bg-gray-200 rounded disabled:opacity-40 disabled:cursor-not-allowed"
+          title="粘贴"
+        >
+          📥
+        </button>
+        <button
+          onClick={handleUndo}
+          className="w-7 h-7 flex items-center justify-center text-gray-600 hover:bg-gray-200 rounded"
+          title="撤销 (Ctrl+Z)"
+        >
+          ↩️
+        </button>
+        <div className="flex-1 text-xs text-gray-500 truncate ml-2">
+          {currentPath || '请选择目录'}
+        </div>
+      </div>
+      <div className="flex-1 min-h-0 overflow-hidden">
         <VirtualList
           items={files}
           itemHeight={ITEM_HEIGHT}
-          containerHeight={600}
           renderItem={(file, index) => (
             <FileListItem
               key={file.path}
@@ -193,11 +483,16 @@ export function FileList() {
               index={index}
               isSelected={selectedFiles.has(file.path)}
               onSelect={selectFile}
+              onDoubleClick={handleDoubleClick}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
             />
           )}
         />
       </div>
-      <div className="px-3 py-2 text-xs text-gray-500 border-t bg-gray-50">
+      <div className="px-3 py-2 text-xs text-gray-500 border-t bg-gray-50 flex-shrink-0">
         共 {files.length} 项，已选择 {selectedFiles.size} 项
       </div>
     </div>

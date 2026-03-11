@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react'
 import { useFileListStore, type SortField } from '../stores/fileListStore'
+import { useTreeStore } from '../stores/treeStore'
 import { useActionLogger } from '../hooks/useActionLogger'
 import { getElectronAPI } from '../utils/electronHelper'
 
@@ -49,7 +50,17 @@ export function FileListToolbar() {
     try {
       const path = await electronAPI.dialog.openDirectory()
       if (path) {
-        useFileListStore.getState().setCurrentPath(path)
+        const fileListStore = useFileListStore.getState()
+        const treeStore = useTreeStore.getState()
+        
+        fileListStore.setCurrentPath(path)
+        treeStore.selectNode(path)
+        
+        if (!treeStore.rootNode) {
+          await treeStore.initializeTree()
+        }
+        
+        await treeStore.expandToPath(path)
       }
     } catch (err) {
       console.error('打开目录失败:', err)

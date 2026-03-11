@@ -7,7 +7,6 @@ interface ResizablePanelProps {
   maxWidth?: number
   width: number
   onWidthChange: (width: number) => void
-  side?: 'left' | 'right'
   className?: string
 }
 
@@ -17,7 +16,6 @@ export function ResizablePanel({
   maxWidth = 400,
   width,
   onWidthChange,
-  side = 'left',
   className = '',
 }: ResizablePanelProps) {
   const [isResizing, setIsResizing] = useState(false)
@@ -33,17 +31,11 @@ export function ResizablePanel({
 
     const panel = panelRef.current
     const rect = panel.getBoundingClientRect()
-    
-    let newWidth: number
-    if (side === 'left') {
-      newWidth = e.clientX - rect.left
-    } else {
-      newWidth = rect.right - e.clientX
-    }
+    const newWidth = e.clientX - rect.left
 
     const clampedWidth = Math.max(minWidth, Math.min(maxWidth, newWidth))
     onWidthChange(clampedWidth)
-  }, [isResizing, minWidth, maxWidth, onWidthChange, side])
+  }, [isResizing, minWidth, maxWidth, onWidthChange])
 
   const handleMouseUp = useCallback(() => {
     setIsResizing(false)
@@ -68,18 +60,19 @@ export function ResizablePanel({
   return (
     <div
       ref={panelRef}
-      className={`relative flex ${className}`}
+      className={`relative flex-shrink-0 ${className}`}
       style={{ width: `${width}px`, minWidth: `${minWidth}px`, maxWidth: `${maxWidth}px` }}
     >
-      {children}
+      <div className="h-full w-full overflow-hidden">
+        {children}
+      </div>
       
       <div
-        className={`absolute top-0 bottom-0 w-1 cursor-col-resize transition-colors z-10 ${
+        className={`absolute top-0 bottom-0 right-0 w-1 cursor-col-resize transition-colors z-10 ${
           isResizing 
             ? 'bg-blue-400' 
             : 'bg-transparent hover:bg-blue-200'
         }`}
-        style={side === 'left' ? { right: 0 } : { left: 0 }}
         onMouseDown={handleMouseDown}
       />
     </div>

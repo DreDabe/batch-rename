@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react'
 import { useFileListStore } from '../stores/fileListStore'
+import { useTreeStore } from '../stores/treeStore'
 import { useActionLogger } from '../hooks/useActionLogger'
 import { SettingsModal } from './SettingsModal'
 import { getElectronAPI } from '../utils/electronHelper'
@@ -19,6 +20,10 @@ export function TopMenuBar() {
   const selectedFiles = useFileListStore((state) => state.getSelectedFiles())
   const setCurrentPath = useFileListStore((state) => state.setCurrentPath)
   const setFiles = useFileListStore((state) => state.setFiles)
+  const expandToPath = useTreeStore((state) => state.expandToPath)
+  const selectNode = useTreeStore((state) => state.selectNode)
+  const rootNode = useTreeStore((state) => state.rootNode)
+  const initializeTree = useTreeStore((state) => state.initializeTree)
 
   const { logClick, logAction, logError } = useActionLogger({
     module: 'TopMenuBar',
@@ -52,6 +57,13 @@ export function TopMenuBar() {
           data: { path },
         })
         setCurrentPath(path)
+        selectNode(path)
+        
+        if (!rootNode) {
+          await initializeTree()
+        }
+        
+        await expandToPath(path)
       }
     } catch (err) {
       logError({
@@ -60,7 +72,7 @@ export function TopMenuBar() {
       })
       alert('打开目录失败：' + (err instanceof Error ? err.message : '未知错误'))
     }
-  }, [setCurrentPath, logClick, logAction, logError])
+  }, [setCurrentPath, expandToPath, selectNode, rootNode, initializeTree, logClick, logAction, logError])
 
   const handleCreateFolder = useCallback(async () => {
     if (!currentPath) return

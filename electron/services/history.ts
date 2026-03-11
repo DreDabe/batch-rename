@@ -34,6 +34,7 @@ export class HistoryService {
       this.history = this.history.slice(0, this.maxHistorySize)
     }
 
+    console.log(`[HistoryService] 记录操作: ${operation}`, { params, rollbackInfo })
     return entry.id
   }
 
@@ -80,7 +81,7 @@ export class HistoryService {
     if (!lastEntry || !lastEntry.rollback) {
       return {
         success: false,
-        error: 'No operation to undo',
+        error: '没有可撤销的操作',
       }
     }
 
@@ -91,7 +92,7 @@ export class HistoryService {
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: error instanceof Error ? error.message : '未知错误',
       }
     }
   }

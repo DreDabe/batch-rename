@@ -13,7 +13,7 @@ export class ConfigService {
     this.config = { ...DEFAULT_CONFIG }
   }
 
-  async load(): Promise<OperationResult<AppConfig>> {
+  async load(): Promise<OperationResult> {
     try {
       const exists = await this.configExists()
 

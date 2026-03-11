@@ -1,9 +1,9 @@
 import { app } from 'electron'
 import fs from 'fs/promises'
-import fsSync from 'fs'
 import path from 'path'
 import os from 'os'
-import type { FileItem, DirectoryInfo, OperationResult } from '../src/types'
+import type { FileItem, DirectoryInfo, OperationResult } from '../../src/types'
+import type { Stats } from 'fs'
 
 export interface DriveInfo {
   name: string
@@ -14,7 +14,7 @@ export interface DriveInfo {
 }
 
 export class FileSystemService {
-  async readDirectory(dirPath: string): Promise<OperationResult<DirectoryInfo>> {
+  async readDirectory(dirPath: string): Promise<OperationResult> {
     try {
       const entries = await fs.readdir(dirPath, { withFileTypes: true })
       const files: FileItem[] = []
@@ -86,7 +86,7 @@ export class FileSystemService {
     }
   }
 
-  async createFolder(parentPath: string, name: string): Promise<OperationResult<string>> {
+  async createFolder(parentPath: string, name: string): Promise<OperationResult> {
     try {
       const newPath = path.join(parentPath, name)
       await fs.mkdir(newPath, { recursive: false })
@@ -101,31 +101,111 @@ export class FileSystemService {
 
   async copy(source: string, destination: string): Promise<OperationResult> {
     try {
-      const stats = await fs.stat(source)
+      const sourceStats = await fs.stat(source)
+      
+      // 检查目标是否存在
+      let destStats
+      try {
+        destStats = await fs.stat(destination)
+      } catch (statError) {
+        // 目标不存在，假设它是一个目录并创建
+        try {
+          await fs.mkdir(destination, { recursive: true })
+          destStats = { isDirectory: () => true } as Stats
+        } catch (mkdirError) {
+          return {
+            success: false,
+            error: `创建目录失败: ${mkdirError instanceof Error ? mkdirError.message : '未知错误'}`,
+          }
+        }
+      }
 
-      if (stats.isDirectory()) {
-        await this.copyDirectory(source, destination)
+      if (destStats.isDirectory()) {
+        // 如果目标是目录，构建完整的目标文件路径
+        const fileName = path.basename(source)
+        const destFilePath = path.join(destination, fileName)
+        
+        // 检查目标文件是否存在
+        try {
+          const destFileStats = await fs.stat(destFilePath)
+          // 目标文件已存在，尝试覆盖
+          if (sourceStats.isDirectory()) {
+            // 如果是目录，先删除目标目录
+            await fs.rm(destFilePath, { recursive: true, force: true })
+            await this.copyDirectory(source, destFilePath)
+          } else {
+            // 如果是文件，直接覆盖
+            await fs.copyFile(source, destFilePath)
+          }
+        } catch (statError) {
+          // 目标文件不存在，直接复制
+          if (sourceStats.isDirectory()) {
+            await this.copyDirectory(source, destFilePath)
+          } else {
+            await fs.copyFile(source, destFilePath)
+          }
+        }
       } else {
-        await fs.copyFile(source, destination)
+        // 如果目标是文件，直接复制
+        if (sourceStats.isDirectory()) {
+          await this.copyDirectory(source, destination)
+        } else {
+          await fs.copyFile(source, destination)
+        }
       }
 
       return { success: true }
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: error instanceof Error ? error.message : '未知错误',
       }
     }
   }
 
   async move(source: string, destination: string): Promise<OperationResult> {
     try {
-      await fs.rename(source, destination)
+      // 检查目标是否存在
+      let destStats
+      try {
+        destStats = await fs.stat(destination)
+      } catch (statError) {
+        // 目标不存在，假设它是一个目录并创建
+        try {
+          await fs.mkdir(destination, { recursive: true })
+          destStats = { isDirectory: () => true } as Stats
+        } catch (mkdirError) {
+          return {
+            success: false,
+            error: `创建目录失败: ${mkdirError instanceof Error ? mkdirError.message : '未知错误'}`,
+          }
+        }
+      }
+      
+      if (destStats.isDirectory()) {
+        // 如果目标是目录，构建完整的目标文件路径
+        const fileName = path.basename(source)
+        const destFilePath = path.join(destination, fileName)
+        
+        // 检查目标文件是否存在
+        try {
+          const destFileStats = await fs.stat(destFilePath)
+          // 目标文件已存在，尝试覆盖
+          await fs.rm(destFilePath, { recursive: true, force: true })
+          await fs.rename(source, destFilePath)
+        } catch (statError) {
+          // 目标文件不存在，直接移动
+          await fs.rename(source, destFilePath)
+        }
+      } else {
+        // 如果目标是文件，直接重命名
+        await fs.rename(source, destination)
+      }
       return { success: true }
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: error instanceof Error ? error.message : '未知错误',
       }
     }
   }
@@ -155,7 +235,7 @@ export class FileSystemService {
     }
   }
 
-  async getStats(targetPath: string): Promise<OperationResult<fs.Stats>> {
+  async getStats(targetPath: string): Promise<OperationResult> {
     try {
       const stats = await fs.stat(targetPath)
       return { success: true, data: stats }
@@ -167,7 +247,7 @@ export class FileSystemService {
     }
   }
 
-  async readFile(targetPath: string, maxSize = 1024 * 1024): Promise<OperationResult<string>> {
+  async readFile(targetPath: string, maxSize = 1024 * 1024): Promise<OperationResult> {
     try {
       const stats = await fs.stat(targetPath)
       if (stats.size > maxSize) {
@@ -186,7 +266,7 @@ export class FileSystemService {
     }
   }
 
-  async readImageBase64(targetPath: string): Promise<OperationResult<string>> {
+  async readImageBase64(targetPath: string): Promise<OperationResult> {
     try {
       const buffer = await fs.readFile(targetPath)
       const ext = path.extname(targetPath).toLowerCase()
@@ -214,7 +294,7 @@ export class FileSystemService {
     return app.getPath('userData')
   }
 
-  async getDrives(): Promise<OperationResult<DriveInfo[]>> {
+  async getDrives(): Promise<OperationResult> {
     try {
       const drives: DriveInfo[] = []
       const platform = os.platform()
