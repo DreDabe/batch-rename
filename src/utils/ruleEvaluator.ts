@@ -193,13 +193,23 @@ export function generatePreview(
 ): { originalName: string; newName: string; originalPath: string; newPath: string }[] {
   return files.map((file, index) => {
     const newName = applyRule(file, pattern, index)
-    const parentPath = file.path.substring(0, file.path.lastIndexOf(file.name))
+    // 正确获取父目录路径：找到最后一个路径分隔符的位置
+    const lastSeparatorIndex = Math.max(
+      file.path.lastIndexOf('\\'),
+      file.path.lastIndexOf('/')
+    )
+    const parentPath = lastSeparatorIndex !== -1 
+      ? file.path.substring(0, lastSeparatorIndex + 1)
+      : ''
+
+    // 构建新路径，确保路径分隔符正确
+    let newPath = parentPath + newName
 
     return {
       originalName: file.name,
       newName,
       originalPath: file.path,
-      newPath: parentPath + newName,
+      newPath,
     }
   })
 }
