@@ -23,7 +23,7 @@ export class RuleManager {
       if (stored) {
         this.rules = JSON.parse(stored)
       }
-    } catch {
+    } catch (error) {
       this.rules = []
     }
   }
@@ -31,7 +31,7 @@ export class RuleManager {
   private saveToStorage(): void {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(this.rules))
-    } catch {
+    } catch (error) {
       // Ignore storage errors
     }
   }

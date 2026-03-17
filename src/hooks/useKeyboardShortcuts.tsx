@@ -25,7 +25,7 @@ export function useKeyboardShortcuts() {
   const copySelected = useFileListStore((state) => state.copySelected)
   const cutSelected = useFileListStore((state) => state.cutSelected)
   const paste = useFileListStore((state) => state.paste)
-  const hasClipboardFiles = useFileListStore((state) => state.hasClipboardFiles)
+
   const previews = useRuleStore((state) => state.previews)
   const clearPreviews = useRuleStore((state) => state.clearPreviews)
 
@@ -34,6 +34,8 @@ export function useKeyboardShortcuts() {
     const path = await window.electronAPI.dialog.openDirectory()
     if (path) {
       setCurrentPath(path)
+      const { updateSettings } = await import('../stores/settingsStore').then(m => m.useSettingsStore.getState())
+      updateSettings('lastOpenedPath', path)
     }
   }, [setCurrentPath])
 

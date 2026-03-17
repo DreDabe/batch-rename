@@ -13,7 +13,7 @@ interface SettingsState {
   resetSettings: () => Promise<void>
 }
 
-export const useSettingsStore = create<SettingsState>((set, get) => ({
+export const useSettingsStore = create<SettingsState>((set) => ({
   settings: { ...DEFAULT_CONFIG },
   isLoading: false,
   hasLoaded: false,
@@ -44,7 +44,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     })
     
     try {
-      const result = await window.electronAPI.config.setConfig(newSettings!)
+      await window.electronAPI.config.setConfig(newSettings!)
     } catch (error) {
     }
   },

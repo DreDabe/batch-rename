@@ -347,6 +347,19 @@ export class FileSystemService {
       return false
     }
   }
+
+  async createFile(parentPath: string, name: string, content: string): Promise<OperationResult> {
+    try {
+      const newPath = path.join(parentPath, name)
+      await fs.writeFile(newPath, content, 'utf-8')
+      return { success: true, data: newPath }
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      }
+    }
+  }
 }
 
 export const fileSystemService = new FileSystemService()

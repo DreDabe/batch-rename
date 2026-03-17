@@ -37,9 +37,32 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('fs:delete', async (_event, pathToDelete: string, recursive = false) => {
+    // 创建备份路径用于撤销
+    const backupPath = `${pathToDelete}.backup${Date.now()}`
+    try {
+      // 复制文件/文件夹到备份位置
+      const fs = require('fs/promises')
+      const path = require('path')
+      
+      // 检查文件是否存在
+      const stats = await fs.stat(pathToDelete)
+      if (stats.isDirectory()) {
+        await fs.cp(pathToDelete, backupPath, { recursive: true })
+      } else {
+        await fs.copyFile(pathToDelete, backupPath)
+      }
+    } catch (err) {
+      console.error('创建备份失败:', err)
+    }
+
     const result = await fileSystemService.delete(pathToDelete, recursive)
 
     if (result.success) {
+      await historyService.recordOperation('delete', { path: pathToDelete, recursive }, {
+        type: 'delete',
+        originalPath: pathToDelete,
+        backupPath: backupPath,
+      })
       await logService.info('File deleted', { path: pathToDelete, recursive })
     }
 
@@ -60,10 +83,32 @@ export function registerIpcHandlers(): void {
     return result
   })
 
+  ipcMain.handle('fs:createFile', async (_event, parentPath: string, name: string, content: string) => {
+    const result = await fileSystemService.createFile(parentPath, name, content)
+
+    if (result.success) {
+      await historyService.recordOperation('createFile', { parentPath, name }, {
+        type: 'create',
+        newPath: result.data,
+      })
+      await logService.info('File created', { parentPath, name })
+    }
+
+    return result
+  })
+
   ipcMain.handle('fs:copy', async (_event, source: string, destination: string) => {
     const result = await fileSystemService.copy(source, destination)
 
     if (result.success) {
+      // 为复制操作添加历史记录，撤销时删除复制的文件
+      const fileName = source.substring(source.lastIndexOf('\\') + 1)
+      const destFilePath = destination + '\\' + fileName
+      
+      await historyService.recordOperation('copy', { source, destination }, {
+        type: 'create',
+        newPath: destFilePath,
+      })
       await logService.info('File copied', { source, destination })
     }
 
@@ -103,6 +148,82 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('fs:hasChildren', async (_event, dirPath: string) => {
     return fileSystemService.hasChildren(dirPath)
+  })
+
+  // Dialog Operations
+  ipcMain.handle('dialog:saveFile', async (_event, options: any) => {
+    const window = BrowserWindow.getFocusedWindow()
+    if (!window) {
+      return { canceled: true, filePath: null }
+    }
+
+    const result = await dialog.showSaveDialog(window, options)
+    return result
+  })
+
+  // Menu Events
+  ipcMain.on('menu:new-file', async (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+    if (window) {
+      // 通知渲染进程创建新文件
+      event.sender.send('menu:new-file')
+    }
+  })
+
+  ipcMain.on('menu:new-folder', async (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+    if (window) {
+      // 通知渲染进程创建新文件夹
+      event.sender.send('menu:new-folder')
+    }
+  })
+
+  ipcMain.on('menu:open-file', async (event, path: string) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+    if (window) {
+      // 通知渲染进程打开文件
+      event.sender.send('menu:open-file', path)
+    }
+  })
+
+  ipcMain.on('menu:open-directory', async (event, path: string) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+    if (window) {
+      // 通知渲染进程打开目录
+      event.sender.send('menu:open-directory', path)
+    }
+  })
+
+  ipcMain.on('menu:save', async (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+    if (window) {
+      // 通知渲染进程保存文件
+      event.sender.send('menu:save')
+    }
+  })
+
+  ipcMain.on('menu:save-as', async (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+    if (window) {
+      // 通知渲染进程另存为文件
+      event.sender.send('menu:save-as')
+    }
+  })
+
+  ipcMain.on('menu:undo', async (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+    if (window) {
+      // 通知渲染进程执行撤销操作
+      event.sender.send('menu:undo')
+    }
+  })
+
+  ipcMain.on('menu:about', async (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+    if (window) {
+      // 通知渲染进程显示关于对话框
+      event.sender.send('menu:about')
+    }
   })
 
   // Dialog Operations
@@ -176,6 +297,10 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('config:removeFavorite', async (_event, path: string) => {
     return configService.removeFavorite(path)
+  })
+
+  ipcMain.handle('config:setConfig', async (_event, config: any) => {
+    return configService.setConfig(config)
   })
 
   // Version Operations

@@ -1,7 +1,5 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-console.log('[preload] preload 脚本开始加载');
-
 const electronAPI = {
   fs: {
     readDirectory: (dirPath: string) => ipcRenderer.invoke('fs:readDirectory', dirPath),
@@ -15,11 +13,13 @@ const electronAPI = {
     readImageBase64: (targetPath: string) => ipcRenderer.invoke('fs:readImageBase64', targetPath),
     getDrives: () => ipcRenderer.invoke('fs:getDrives'),
     hasChildren: (dirPath: string) => ipcRenderer.invoke('fs:hasChildren', dirPath),
+    createFile: (parentPath: string, name: string, content: string) => ipcRenderer.invoke('fs:createFile', parentPath, name, content),
   },
 
   dialog: {
     openDirectory: () => ipcRenderer.invoke('dialog:openDirectory'),
     showMessage: (options: any) => ipcRenderer.invoke('dialog:showMessage', options),
+    saveFile: (options: any) => ipcRenderer.invoke('dialog:saveFile', options),
   },
 
   history: {
@@ -34,6 +34,7 @@ const electronAPI = {
     load: () => ipcRenderer.invoke('config:load'),
     get: () => ipcRenderer.invoke('config:get'),
     update: (key: string, value: any) => ipcRenderer.invoke('config:update', key, value),
+    setConfig: (config: any) => ipcRenderer.invoke('config:setConfig', config),
     addFavorite: (path: string) => ipcRenderer.invoke('config:addFavorite', path),
     removeFavorite: (path: string) => ipcRenderer.invoke('config:removeFavorite', path),
   },
@@ -46,15 +47,21 @@ const electronAPI = {
   debug: {
     log: (message: string, data: any) => ipcRenderer.send('debug:log', message, data),
   },
-};
 
-console.log('[preload] electronAPI 对象创建完成');
+  menu: {
+    onNewFile: (callback: () => void) => ipcRenderer.on('menu:new-file', callback),
+    onNewFolder: (callback: () => void) => ipcRenderer.on('menu:new-folder', callback),
+    onOpenFile: (callback: (event: any, path: string) => void) => ipcRenderer.on('menu:open-file', callback),
+    onOpenDirectory: (callback: (event: any, path: string) => void) => ipcRenderer.on('menu:open-directory', callback),
+    onSave: (callback: () => void) => ipcRenderer.on('menu:save', callback),
+    onSaveAs: (callback: () => void) => ipcRenderer.on('menu:save-as', callback),
+    onUndo: (callback: () => void) => ipcRenderer.on('menu:undo', callback),
+    onAbout: (callback: () => void) => ipcRenderer.on('menu:about', callback),
+  },
+};
 
 try {
   contextBridge.exposeInMainWorld('electronAPI', electronAPI);
-  console.log('[preload] electronAPI 已成功暴露到 window 对象');
 } catch (error) {
-  console.error('[preload] 暴露 electronAPI 时出错:', error);
 }
 
-console.log('[preload] preload 脚本加载完成');

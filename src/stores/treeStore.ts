@@ -1,8 +1,8 @@
 import { create } from 'zustand'
-import { createModuleLogger } from '../utils/logger'
+
 import type { DriveInfo, FileItem } from '../types'
 
-const log = createModuleLogger('TreeStore')
+
 
 export interface TreeNode {
   id: string

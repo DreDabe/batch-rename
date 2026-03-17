@@ -1,12 +1,11 @@
 import { create } from 'zustand'
 import type { RenamePreview } from '../types/rules'
-import type { FileItem } from '../types'
+import type { FileItem, NumberType } from '../types'
 import { createRenameEngine } from '../utils/ruleEngine'
 import { createModuleLogger } from '../utils/logger'
+import { useSettingsStore } from './settingsStore'
 
 const log = createModuleLogger('RuleStore')
-
-export type NumberType = 'none' | 'number' | 'lowerLetter' | 'upperLetter'
 
 export interface RuleConfig {
   pattern: string
@@ -65,8 +64,9 @@ export const useRuleStore = create<RuleState>((set, get) => ({
     }))
   },
 
-  generatePreviews: (files) => {
+  generatePreviews: async (files) => {
     const { ruleConfig } = get()
+    const { settings } = useSettingsStore.getState()
     let pattern = get().getPatternString()
 
     // 如果用户使用了自定义规则且规则中没有包含{$ext}，则添加文件扩展名处理
@@ -114,12 +114,36 @@ export const useRuleStore = create<RuleState>((set, get) => ({
       return
     }
 
-    const previews = engine.preview(files)
+    let previews = engine.preview(files)
+    
+    // 检查文件是否存在
+    for (const preview of previews) {
+      if (preview.originalPath !== preview.newPath) {
+        try {
+          const result = await window.electronAPI.fs.exists(preview.newPath)
+          if (result) {
+            preview.hasConflict = true
+            preview.conflictType = 'exists'
+          }
+        } catch {
+          // 忽略文件系统访问错误
+        }
+      }
+    }
+    
+    // 如果允许覆盖，过滤掉已存在文件的冲突
+    if (settings.allowOverwrite) {
+      previews = previews.map(preview => ({
+        ...preview,
+        hasConflict: preview.hasConflict && preview.conflictType !== 'exists'
+      }))
+    }
+    
     const conflictCount = previews.filter((p) => p.hasConflict).length
     log.logAction({
       actionType: 'load',
       message: `预览生成完成`,
-      data: { previewCount: previews.length, conflictCount },
+      data: { previewCount: previews.length, conflictCount, allowOverwrite: settings.allowOverwrite },
     })
     set({ previews, error: null })
   },

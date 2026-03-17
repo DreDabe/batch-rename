@@ -1,9 +1,11 @@
 import { useState, useCallback } from 'react'
 import { useFileListStore } from '../stores/fileListStore'
 import { useTreeStore } from '../stores/treeStore'
+import { useRuleStore } from '../stores/ruleStore'
 import { useActionLogger } from '../hooks/useActionLogger'
 import { SettingsModal } from './SettingsModal'
 import { getElectronAPI } from '../utils/electronHelper'
+import { useSettingsStore } from '../stores/settingsStore'
 
 interface MenuItem {
   id: string
@@ -24,6 +26,8 @@ export function TopMenuBar() {
   const selectNode = useTreeStore((state) => state.selectNode)
   const rootNode = useTreeStore((state) => state.rootNode)
   const initializeTree = useTreeStore((state) => state.initializeTree)
+  const { settings } = useSettingsStore()
+  const { theme } = settings
 
   const { logClick, logAction, logError } = useActionLogger({
     module: 'TopMenuBar',
@@ -64,6 +68,9 @@ export function TopMenuBar() {
         }
         
         await expandToPath(path)
+        
+        const { updateSettings } = useSettingsStore.getState()
+        updateSettings('lastOpenedPath', path)
       }
     } catch (err) {
       logError({
@@ -76,42 +83,66 @@ export function TopMenuBar() {
 
   const handleCreateFolder = useCallback(async () => {
     if (!currentPath) return
-
+    logClick('新建文件夹菜单项')
+    
     const electronAPI = getElectronAPI()
     if (!electronAPI) {
       alert('当前环境不是Electron，无法使用文件系统功能')
       return
     }
 
-    logClick('新建文件夹菜单项')
-    const name = prompt('请输入文件夹名称')
-    if (!name) return
-
+    // 生成唯一的文件夹名称
+    let folderName = '新建文件夹'
+    let counter = 1
+    let newFolderPath = `${currentPath}\\${folderName}`
+    
+    // 检查文件夹是否已存在
+    while (true) {
+      try {
+        const exists = await window.electronAPI.fs.exists(newFolderPath)
+        if (!exists) break
+        folderName = `新建文件夹 (${counter++})`
+        newFolderPath = `${currentPath}\\${folderName}`
+      } catch (error) {
+        break
+      }
+    }
+    
     logAction({
       actionType: 'create',
       message: '创建文件夹',
-      data: { name, parentPath: currentPath },
+      data: { name: folderName, parentPath: currentPath },
     })
 
-    const result = await electronAPI.fs.createFolder(currentPath, name)
+    const result = await electronAPI.fs.createFolder(currentPath, folderName)
     if (result.success) {
       logAction({
         actionType: 'create',
         message: '文件夹创建成功，刷新列表',
-        data: { name },
+        data: { name: folderName },
       })
       const refreshResult = await electronAPI.fs.readDirectory(currentPath)
       if (refreshResult.success && refreshResult.data) {
         setFiles(refreshResult.data.files)
+        // 找到新创建的文件夹并选中它
+        const newFolderIndex = refreshResult.data.files.findIndex((file: any) => file.path === newFolderPath)
+        if (newFolderIndex !== -1) {
+          const { selectFile } = useFileListStore.getState()
+          selectFile(newFolderPath, newFolderIndex, false, false)
+          
+          // 设置规则面板中的自定义规则为文件夹名称
+          const { setRuleConfig } = useRuleStore.getState()
+          setRuleConfig({ pattern: folderName })
+        }
       }
     } else {
       logError({
         message: '创建文件夹失败',
-        data: { name, error: result.error },
+        data: { name: folderName, error: result.error },
       })
       alert(result.error || '创建失败')
     }
-  }, [currentPath, setFiles, logClick, logAction, logError])
+  }, [currentPath, logClick, logAction, logError, setFiles])
 
   const handleDelete = useCallback(async () => {
     if (selectedFiles.length === 0) return
@@ -150,25 +181,6 @@ export function TopMenuBar() {
     }
   }, [selectedFiles, currentPath, setFiles, logClick, logAction])
 
-  const handleAddFavorite = useCallback(async () => {
-    if (!currentPath) return
-
-    const electronAPI = getElectronAPI()
-    if (!electronAPI) {
-      alert('当前环境不是Electron，无法使用收藏功能')
-      return
-    }
-
-    logClick('添加收藏菜单项')
-    logAction({
-      actionType: 'save',
-      message: `添加收藏`,
-      data: { path: currentPath },
-    })
-    await electronAPI.config.addFavorite(currentPath)
-    alert('已添加到收藏夹')
-  }, [currentPath, logClick, logAction])
-
   const handleOpenSettings = useCallback(() => {
     logClick('设置菜单项')
     logAction({
@@ -190,13 +202,12 @@ export function TopMenuBar() {
     { id: 'open', label: '打开目录', icon: '📂', onClick: handleOpenDirectory },
     { id: 'newFolder', label: '新建文件夹', icon: '📁', onClick: handleCreateFolder, disabled: !currentPath },
     { id: 'delete', label: '删除', icon: '🗑️', onClick: handleDelete, disabled: selectedFiles.length === 0, danger: true },
-    { id: 'favorite', label: '添加收藏', icon: '⭐', onClick: handleAddFavorite, disabled: !currentPath },
     { id: 'settings', label: '设置', icon: '⚙️', onClick: handleOpenSettings },
   ]
 
   return (
     <>
-      <div className="flex items-center gap-1 px-2 py-1 bg-gray-50 border-b">
+      <div data-testid="top-menu-bar" className={`flex items-center gap-1 px-2 py-1 border-b ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'}`}>
         {menuItems.map((item) => (
           <button
             key={item.id}
@@ -204,10 +215,10 @@ export function TopMenuBar() {
             disabled={item.disabled}
             className={`flex items-center gap-1 px-3 py-1.5 text-sm rounded transition-colors ${
               item.disabled
-                ? 'text-gray-300 cursor-not-allowed'
+                ? theme === 'dark' ? 'text-gray-500 cursor-not-allowed' : 'text-gray-300 cursor-not-allowed'
                 : item.danger
-                ? 'text-red-500 hover:bg-red-50'
-                : 'text-gray-600 hover:bg-gray-100'
+                ? theme === 'dark' ? 'text-red-400 hover:bg-red-900/20' : 'text-red-500 hover:bg-red-50'
+                : theme === 'dark' ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-100'
             }`}
           >
             <span>{item.icon}</span>

@@ -1,10 +1,39 @@
-node_modules
-dist
-dist-electron
-release
+# 依赖项
+node_modules/
+
+# 构建产物
+dist/
+dist-electron/
+release/
+
+# 临时文件和日志
 *.log
 .DS_Store
 Thumbs.db
 
+# 编辑器和IDE相关
+.vscode/
+.idea/
+
+# 系统相关
+*.swp
+*.swo
+*~
+
+# 环境变量文件
+.env
+.env.local
+.env.*.local
+
+# 类型脚本缓存
+*.tsbuildinfo
+
+# Vite 生成的临时文件
+vite.config.ts.timestamp-*.mjs
+
+# Inno Setup 相关
+installer.iss
+
+# 项目特定的忽略项
 .trae/
 doc/

@@ -62,19 +62,40 @@ export interface HistoryEntry {
   rollback?: () => Promise<void>
 }
 
+export type NumberType = 'none' | 'number' | 'lowerLetter' | 'upperLetter'
+
+export type TagPosition = 'left' | 'right'
+
 export interface AppConfig {
-  theme: 'light' | 'dark' | 'system'
+  theme: 'light' | 'dark'
   language: 'zh-CN' | 'en-US'
   lastOpenedPath?: string
   favorites: string[]
   recentPaths: string[]
+  openLastPath: boolean
+  showSuccessAlert: boolean
+  allowOverwrite: boolean
+  numberType: NumberType
+  customExtensions: string[]
+  customRule: string
+  tagPosition: TagPosition
+  darkMode?: boolean
+  autoRefreshAfterRename?: boolean
 }
 
 export const DEFAULT_CONFIG: AppConfig = {
-  theme: 'system',
+  theme: 'light',
   language: 'zh-CN',
+  lastOpenedPath: '',
   favorites: [],
   recentPaths: [],
+  openLastPath: false,
+  showSuccessAlert: true,
+  allowOverwrite: false,
+  numberType: 'none',
+  customExtensions: [],
+  customRule: '{$f}',
+  tagPosition: 'right',
 }
 
 export * from './rules'

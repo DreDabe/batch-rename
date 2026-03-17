@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useFileListStore, formatFileSize } from '../stores/fileListStore'
 import { getFileIcon, getFileTypeLabel } from '../utils/fileIcons'
-import { createModuleLogger } from '../utils/logger'
+
 import { Tooltip } from './Tooltip'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import type { FileItem } from '../types'
+import { useSettingsStore } from '../stores/settingsStore'
 
-const log = createModuleLogger('FileList')
+
 
 const ITEM_HEIGHT = 56
 const OVERSCAN = 5
@@ -17,7 +18,7 @@ interface VirtualListProps {
   renderItem: (item: FileItem, index: number) => React.ReactNode
 }
 
-function VirtualList({ items, itemHeight, renderItem }: VirtualListProps) {
+function VirtualList({ items, itemHeight, renderItem, theme }: VirtualListProps & { theme: 'light' | 'dark' }) {
   const [scrollTop, setScrollTop] = useState(0)
   const [containerHeight, setContainerHeight] = useState(600)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -62,7 +63,7 @@ function VirtualList({ items, itemHeight, renderItem }: VirtualListProps) {
       onScroll={handleScroll}
       style={{
         scrollbarWidth: 'thin',
-        scrollbarColor: '#cbd5e1 #f1f5f9',
+        scrollbarColor: theme === 'dark' ? '#4b5563 #1f2937' : '#cbd5e1 #f1f5f9',
       }}
     >
       <style>{`
@@ -70,14 +71,14 @@ function VirtualList({ items, itemHeight, renderItem }: VirtualListProps) {
           width: 8px;
         }
         .overflow-auto::-webkit-scrollbar-track {
-          background: #f1f5f9;
+          background: ${theme === 'dark' ? '#1f2937' : '#f1f5f9'};
         }
         .overflow-auto::-webkit-scrollbar-thumb {
-          background-color: #cbd5e1;
+          background-color: ${theme === 'dark' ? '#4b5563' : '#cbd5e1'};
           border-radius: 4px;
         }
         .overflow-auto::-webkit-scrollbar-thumb:hover {
-          background-color: #94a3b8;
+          background-color: ${theme === 'dark' ? '#6b7280' : '#94a3b8'};
         }
       `}</style>
       <div style={{ height: totalHeight, position: 'relative' }}>
@@ -112,7 +113,7 @@ interface FileListItemProps {
   onDrop: (e: React.DragEvent, folderPath: string) => void
 }
 
-function FileListItem({ file, index, isSelected, onSelect, onDoubleClick, onDragStart, onDragEnd, onDragOver, onDrop }: FileListItemProps) {
+function FileListItem({ file, index, isSelected, onSelect, onDoubleClick, onDragStart, onDragEnd, onDragOver, onDrop, theme }: FileListItemProps & { theme: 'light' | 'dark' }) {
   const [isDragOver, setIsDragOver] = useState(false)
 
   const handleClick = useCallback((e: React.MouseEvent) => {
@@ -150,12 +151,18 @@ function FileListItem({ file, index, isSelected, onSelect, onDoubleClick, onDrag
 
   return (
     <div
-      className={`flex items-start px-3 py-1.5 cursor-pointer border-b border-gray-100 transition-colors select-none ${ 
+      className={`flex items-start px-3 py-1.5 cursor-pointer transition-all duration-200 select-none ${ 
         isSelected
-          ? 'bg-blue-50 border-l-2 border-l-blue-500'
+          ? theme === 'dark' 
+            ? 'bg-blue-800/40 border-l-2 border-l-blue-400 shadow-lg shadow-blue-900/20 border-b border-blue-900/50' 
+            : 'bg-blue-50 border-l-2 border-l-blue-500 border-b border-blue-200'
           : isDragOver && file.isDirectory
-          ? 'bg-green-50 border-l-2 border-l-green-500'
-          : 'hover:bg-gray-50 border-l-2 border-l-transparent'
+          ? theme === 'dark' 
+            ? 'bg-green-800/40 border-l-2 border-l-green-400 shadow-lg shadow-green-900/20 border-b border-green-900/50' 
+            : 'bg-green-50 border-l-2 border-l-green-500 border-b border-green-200'
+          : theme === 'dark' 
+            ? 'hover:bg-gray-800 border-l-2 border-l-transparent border-b border-gray-700' 
+            : 'hover:bg-gray-50 border-l-2 border-l-transparent border-b border-gray-100'
       }`}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
@@ -170,15 +177,19 @@ function FileListItem({ file, index, isSelected, onSelect, onDoubleClick, onDrag
       <div className="flex-1 min-w-0 flex flex-col">
         <div className="flex items-center justify-between">
           <Tooltip content={file.name}>
-            <div className="text-sm font-medium text-gray-900 truncate flex-1 min-w-0">
+            <div className={`text-sm font-medium truncate flex-1 min-w-0 transition-colors duration-200 ${ 
+              isSelected 
+                ? theme === 'dark' ? 'text-blue-300 font-semibold' : 'text-blue-800 font-semibold' 
+                : theme === 'dark' ? 'text-gray-200' : 'text-gray-900'
+            }`}>
               {file.name}
             </div>
           </Tooltip>
-          <div className="text-xs text-gray-400 flex-shrink-0 whitespace-nowrap ml-2 w-16 text-right">
+          <div className={`text-xs flex-shrink-0 whitespace-nowrap ml-2 w-16 text-right ${theme === 'dark' ? 'text-gray-400' : 'text-gray-400'}`}>
             {file.isDirectory ? '--' : formatFileSize(file.size)}
           </div>
         </div>
-        <div className="text-xs text-gray-500 mt-0.5">{typeLabel}</div>
+        <div className={`text-xs mt-0.5 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-500'}`}>{typeLabel}</div>
       </div>
     </div>
   )
@@ -208,6 +219,9 @@ export function FileList() {
     paste,
     hasClipboardFiles,
   } = useFileListStore()
+  
+  const { settings } = useSettingsStore()
+  const { theme } = settings
 
   const files = getFilteredAndSortedFiles()
 
@@ -256,6 +270,9 @@ export function FileList() {
   const handleDoubleClick = useCallback((file: FileItem) => {
     if (file.isDirectory) {
       setCurrentPath(file.path)
+      // 更新上次打开的路径
+      const { updateSettings } = useSettingsStore.getState()
+      updateSettings('lastOpenedPath', file.path)
     } else {
       setPreviewFile(file)
     }
@@ -354,7 +371,7 @@ export function FileList() {
 
   if (!currentPath) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-gray-400">
+      <div className={`flex flex-col items-center justify-center h-full ${theme === 'dark' ? 'text-gray-400 bg-gray-900' : 'text-gray-400 bg-white'}`}>
         <span className="text-4xl mb-2">📂</span>
         <span className="text-sm">请选择一个目录</span>
       </div>
@@ -363,7 +380,7 @@ export function FileList() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-gray-400">
+      <div className={`flex flex-col items-center justify-center h-full ${theme === 'dark' ? 'text-gray-400 bg-gray-900' : 'text-gray-400 bg-white'}`}>
         <div className="animate-spin text-3xl mb-2">⏳</div>
         <span className="text-sm">加载中...</span>
       </div>
@@ -372,7 +389,7 @@ export function FileList() {
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-red-400">
+      <div className={`flex flex-col items-center justify-center h-full ${theme === 'dark' ? 'text-red-400 bg-gray-900' : 'text-red-400 bg-white'}`}>
         <span className="text-4xl mb-2">⚠️</span>
         <span className="text-sm">{error}</span>
       </div>
@@ -381,7 +398,7 @@ export function FileList() {
 
   if (files.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-gray-400">
+      <div className={`flex flex-col items-center justify-center h-full ${theme === 'dark' ? 'text-gray-400 bg-gray-900' : 'text-gray-400 bg-white'}`}>
         <span className="text-4xl mb-2">📭</span>
         <span className="text-sm">目录为空</span>
       </div>
@@ -389,12 +406,12 @@ export function FileList() {
   }
 
   return (
-    <div className="h-full flex flex-col min-h-0">
-      <div className="flex items-center gap-1 px-3 py-2 border-b bg-gray-50 flex-shrink-0">
+    <div className={`h-full flex flex-col min-h-0 ${theme === 'dark' ? 'bg-gray-900' : 'bg-white'}`} style={{ backgroundColor: theme === 'dark' ? '#111827' : '#ffffff' }}>
+      <div className={`flex items-center gap-1 px-3 py-2 border-b flex-shrink-0 ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'}`}>
         <button
           onClick={handleGoBack}
           disabled={!canGoBack()}
-          className="w-7 h-7 flex items-center justify-center text-gray-600 hover:bg-gray-200 rounded disabled:opacity-40 disabled:cursor-not-allowed"
+          className={`w-7 h-7 flex items-center justify-center rounded disabled:opacity-40 disabled:cursor-not-allowed ${theme === 'dark' ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200'}`}
           title="返回"
         >
           ←
@@ -402,16 +419,16 @@ export function FileList() {
         <button
           onClick={handleGoForward}
           disabled={!canGoForward()}
-          className="w-7 h-7 flex items-center justify-center text-gray-600 hover:bg-gray-200 rounded disabled:opacity-40 disabled:cursor-not-allowed"
+          className={`w-7 h-7 flex items-center justify-center rounded disabled:opacity-40 disabled:cursor-not-allowed ${theme === 'dark' ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200'}`}
           title="前进"
         >
           →
         </button>
-        <div className="w-px h-5 bg-gray-300 mx-1" />
+        <div className={`w-px h-5 mx-1 ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-300'}`} />
         <button
           onClick={handleCopy}
           disabled={selectedFiles.size === 0}
-          className="w-7 h-7 flex items-center justify-center text-gray-600 hover:bg-gray-200 rounded disabled:opacity-40 disabled:cursor-not-allowed"
+          className={`w-7 h-7 flex items-center justify-center rounded disabled:opacity-40 disabled:cursor-not-allowed ${theme === 'dark' ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200'}`}
           title="复制"
         >
           📋
@@ -419,7 +436,7 @@ export function FileList() {
         <button
           onClick={handleCut}
           disabled={selectedFiles.size === 0}
-          className="w-7 h-7 flex items-center justify-center text-gray-600 hover:bg-gray-200 rounded disabled:opacity-40 disabled:cursor-not-allowed"
+          className={`w-7 h-7 flex items-center justify-center rounded disabled:opacity-40 disabled:cursor-not-allowed ${theme === 'dark' ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200'}`}
           title="剪切"
         >
           ✂️
@@ -427,23 +444,23 @@ export function FileList() {
         <button
           onClick={handlePaste}
           disabled={!hasClipboardFiles()}
-          className="w-7 h-7 flex items-center justify-center text-gray-600 hover:bg-gray-200 rounded disabled:opacity-40 disabled:cursor-not-allowed"
+          className={`w-7 h-7 flex items-center justify-center rounded disabled:opacity-40 disabled:cursor-not-allowed ${theme === 'dark' ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200'}`}
           title="粘贴"
         >
           📥
         </button>
         <button
           onClick={handleUndo}
-          className="w-7 h-7 flex items-center justify-center text-gray-600 hover:bg-gray-200 rounded"
+          className={`w-7 h-7 flex items-center justify-center rounded ${theme === 'dark' ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200'}`}
           title="撤销 (Ctrl+Z)"
         >
           ↩️
         </button>
-        <div className="flex-1 text-xs text-gray-500 truncate ml-2">
+        <div className={`flex-1 text-xs truncate ml-2 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
           {currentPath || '请选择目录'}
         </div>
       </div>
-      <div className="flex-1 min-h-0 overflow-hidden">
+      <div className="flex-1 min-h-0 overflow-hidden" style={{ backgroundColor: theme === 'dark' ? '#111827' : '#ffffff' }}>
         <VirtualList
           items={files}
           itemHeight={ITEM_HEIGHT}
@@ -459,11 +476,13 @@ export function FileList() {
               onDragEnd={handleDragEnd}
               onDragOver={handleDragOver}
               onDrop={handleDrop}
+              theme={theme}
             />
           )}
+          theme={theme}
         />
       </div>
-      <div className="px-3 py-2 text-xs text-gray-500 border-t bg-gray-50 flex-shrink-0">
+      <div className={`px-3 py-2 text-xs border-t flex-shrink-0 ${theme === 'dark' ? 'bg-gray-800 border-gray-700 text-gray-400' : 'bg-gray-50 border-gray-200 text-gray-500'}`}>
         共 {files.length} 项，已选择 {selectedFiles.size} 项
       </div>
     </div>

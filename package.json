@@ -11,6 +11,14 @@
     "build": "tsc && vite build && electron-builder",
     "build:vite": "tsc && vite build",
     "build:win": "tsc && vite build && electron-builder --win",
+
+    "package:win": "tsc && vite build && electron-packager . --platform=win32 --arch=x64 --out=release --overwrite --ignore=node_modules --ignore=test --ignore=.gitignore --ignore=.npmrc --ignore=.prettierrc --ignore=electron-builder.yml --ignore=eslint.config.js --ignore=postcss.config.js --ignore=tailwind.config.js --ignore=tsconfig.json --ignore=tsconfig.node.json --ignore=vitest.config.ts --ignore=installer.iss --ignore=installer-simple.iss --ignore=.trae --ignore=doc",
+
+
+
+
+
+
     "preview": "vite preview",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
@@ -38,6 +46,7 @@
     "autoprefixer": "^10.4.17",
     "electron": "^28.1.0",
     "electron-builder": "^24.9.1",
+    "electron-packager": "^17.1.2",
     "eslint": "^9.0.0",
     "eslint-plugin-react-hooks": "^5.0.0",
     "eslint-plugin-react-refresh": "^0.4.5",
@@ -67,7 +76,9 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "public/icon.ico"

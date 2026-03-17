@@ -2,6 +2,7 @@ import { useEffect, useCallback, useState } from 'react'
 import { useTreeStore, type TreeNode } from '../stores/treeStore'
 import { useFileListStore } from '../stores/fileListStore'
 import { createModuleLogger } from '../utils/logger'
+import { useSettingsStore } from '../stores/settingsStore'
 
 const log = createModuleLogger('TreePanel')
 
@@ -31,8 +32,9 @@ function TreeNodeItem({
   selectedPath, 
   expandedPaths,
   onDragOver,
-  onDrop
-}: TreeNodeItemProps) {
+  onDrop,
+  theme
+}: TreeNodeItemProps & { theme: 'light' | 'dark' }) {
   const [isDragOver, setIsDragOver] = useState(false)
   const isExpanded = expandedPaths.has(node.id)
   const isSelected = selectedPath === node.path
@@ -84,10 +86,10 @@ function TreeNodeItem({
       <div
         className={`flex items-center px-2 py-1 cursor-pointer transition-colors group ${
           isSelected 
-            ? 'bg-blue-100 text-blue-800' 
+            ? theme === 'dark' ? 'bg-blue-900/30 text-blue-400' : 'bg-blue-100 text-blue-800' 
             : isDragOver
-            ? 'bg-green-100 text-green-800'
-            : 'hover:bg-gray-100'
+            ? theme === 'dark' ? 'bg-green-900/30 text-green-400' : 'bg-green-100 text-green-800'
+            : theme === 'dark' ? 'hover:bg-gray-800' : 'hover:bg-gray-100'
         }`}
         style={{ paddingLeft: `${depth * 16 + 8}px` }}
         onClick={handleClick}
@@ -98,7 +100,7 @@ function TreeNodeItem({
         {hasChildren ? (
           <button
             onClick={handleToggle}
-            className="w-4 h-4 flex items-center justify-center text-gray-500 hover:text-gray-700 mr-1 flex-shrink-0"
+            className={`w-4 h-4 flex items-center justify-center mr-1 flex-shrink-0 ${theme === 'dark' ? 'text-gray-400 hover:text-gray-300' : 'text-gray-500 hover:text-gray-700'}`}
           >
             {node.isLoading ? (
               <span className="animate-spin text-xs">⏳</span>
@@ -117,7 +119,9 @@ function TreeNodeItem({
         </span>
         
         <span className={`text-sm truncate flex-1 ${
-          isSelected ? 'text-blue-800' : 'text-gray-900'
+          isSelected 
+            ? theme === 'dark' ? 'text-blue-400' : 'text-blue-800'
+            : theme === 'dark' ? 'text-gray-300' : 'text-gray-900'
         }`}>
           {node.name}
         </span>
@@ -125,14 +129,18 @@ function TreeNodeItem({
 
       {node.error && (
         <div 
-          className="px-2 py-1 text-xs text-red-600 bg-red-50 border-l-2 border-red-400"
+          className={`px-2 py-1 text-xs border-l-2 ${
+            theme === 'dark' ? 'text-red-400 bg-red-900/20 border-red-700' : 'text-red-600 bg-red-50 border-red-400'
+          }`}
           style={{ paddingLeft: `${depth * 16 + 24}px` }}
         >
           <div className="flex items-center justify-between">
             <span>{node.error}</span>
             <button
               onClick={handleRetry}
-              className="ml-2 text-blue-500 hover:text-blue-700 underline"
+              className={`ml-2 underline ${
+                theme === 'dark' ? 'text-blue-400 hover:text-blue-300' : 'text-blue-500 hover:text-blue-700'
+              }`}
             >
               重试
             </button>
@@ -153,6 +161,7 @@ function TreeNodeItem({
               expandedPaths={expandedPaths}
               onDragOver={onDragOver}
               onDrop={onDrop}
+              theme={theme}
             />
           ))}
         </div>
@@ -176,6 +185,8 @@ export function TreePanel() {
   } = useTreeStore()
   
   const setCurrentPath = useFileListStore((state) => state.setCurrentPath)
+  const { settings } = useSettingsStore()
+  const { theme } = settings
 
   useEffect(() => {
     debugLog('TreePanel mounted, 初始化目录树')
@@ -208,6 +219,10 @@ export function TreePanel() {
     selectNode(path)
     setCurrentPath(path)
     log.info(`选择目录: ${path}`)
+    
+    // 更新上次打开的路径
+    const { updateSettings } = useSettingsStore.getState()
+    updateSettings('lastOpenedPath', path)
   }, [selectNode, setCurrentPath, log])
 
   const handleToggle = useCallback((nodeId: string, nodePath: string) => {
@@ -263,10 +278,10 @@ export function TreePanel() {
 
   if (isPanelCollapsed) {
     return (
-      <div className="h-full w-full flex flex-col items-center py-2 bg-gray-50">
+      <div className={`h-full w-full flex flex-col items-center py-2 ${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-50'}`}>
         <button
           onClick={togglePanel}
-          className="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-200 rounded mb-2"
+          className={`w-8 h-8 flex items-center justify-center rounded mb-2 ${theme === 'dark' ? 'text-gray-400 hover:text-gray-300 hover:bg-gray-700' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'}`}
           title="展开面板"
         >
           ▶
@@ -274,7 +289,7 @@ export function TreePanel() {
         
         <div className="flex flex-col items-center gap-1 mt-2">
           <div 
-            className="w-8 h-8 flex items-center justify-center text-lg cursor-pointer hover:bg-gray-200 rounded"
+            className={`w-8 h-8 flex items-center justify-center text-lg cursor-pointer rounded ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-200'}`}
             title="此电脑"
           >
             💻
@@ -282,8 +297,10 @@ export function TreePanel() {
           {rootNode?.children?.map((drive) => (
             <div
               key={drive.id}
-              className={`w-8 h-8 flex items-center justify-center text-lg cursor-pointer hover:bg-gray-200 rounded ${
-                selectedPath === drive.path ? 'bg-blue-100' : ''
+              className={`w-8 h-8 flex items-center justify-center text-lg cursor-pointer rounded ${
+                theme === 'dark' 
+                  ? selectedPath === drive.path ? 'bg-blue-900/30' : 'hover:bg-gray-700'
+                  : selectedPath === drive.path ? 'bg-blue-100' : 'hover:bg-gray-200'
               }`}
               title={drive.name}
               onClick={() => handleSelect(drive.path)}
@@ -297,12 +314,12 @@ export function TreePanel() {
   }
 
   return (
-    <div className="h-full w-full flex flex-col bg-white overflow-hidden">
-      <div className="flex items-center justify-between px-3 py-2 border-b bg-gray-50 flex-shrink-0">
-        <span className="text-sm font-medium text-gray-700">文件目录</span>
+    <div className={`h-full w-full flex flex-col overflow-hidden ${theme === 'dark' ? 'bg-gray-900' : 'bg-white'}`}>
+      <div className={`flex items-center justify-between px-3 py-2 border-b flex-shrink-0 ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'}`}>
+        <span className={`text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>文件目录</span>
         <button
           onClick={togglePanel}
-          className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-200 rounded"
+          className={`w-6 h-6 flex items-center justify-center rounded ${theme === 'dark' ? 'text-gray-400 hover:text-gray-300 hover:bg-gray-700' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'}`}
           title="收缩面板"
         >
           ◀
@@ -311,19 +328,19 @@ export function TreePanel() {
 
       <div className="flex-1 overflow-auto min-h-0">
         {isLoading && !rootNode && (
-          <div className="flex items-center justify-center h-20 text-gray-400">
+          <div className={`flex items-center justify-center h-20 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-400'}`}>
             <div className="animate-spin mr-2">⏳</div>
             <span className="text-sm">加载中...</span>
           </div>
         )}
 
         {error && (
-          <div className="flex flex-col items-center justify-center h-20 text-red-400 px-4">
+          <div className={`flex flex-col items-center justify-center h-20 px-4 ${theme === 'dark' ? 'text-red-400' : 'text-red-400'}`}>
             <span className="text-lg mb-1">⚠️</span>
             <span className="text-xs text-center">{error}</span>
             <button
               onClick={initializeTree}
-              className="mt-2 text-xs text-blue-500 hover:text-blue-600"
+              className={`mt-2 text-xs ${theme === 'dark' ? 'text-blue-400 hover:text-blue-300' : 'text-blue-500 hover:text-blue-600'}`}
             >
               重试
             </button>
@@ -341,6 +358,7 @@ export function TreePanel() {
               expandedPaths={expandedPaths}
               onDragOver={handleDragOver}
               onDrop={handleDrop}
+              theme={theme}
             />
           </div>
         )}

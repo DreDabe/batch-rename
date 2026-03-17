@@ -7,6 +7,7 @@ interface FileSystemAPI {
   rename: (oldPath: string, newPath: string) => Promise<OperationResult>
   delete: (pathToDelete: string, recursive?: boolean) => Promise<OperationResult>
   createFolder: (parentPath: string, name: string) => Promise<OperationResult<string>>
+  createFile: (parentPath: string, name: string, content: string) => Promise<OperationResult<string>>
   copy: (source: string, destination: string) => Promise<OperationResult>
   move: (source: string, destination: string) => Promise<OperationResult>
   exists: (targetPath: string) => Promise<boolean>
@@ -32,6 +33,18 @@ interface DialogAPI {
     message: string
     buttons?: string[]
   }) => Promise<{ response: number; checkboxChecked: boolean }>
+  saveFile: (options: any) => Promise<{ canceled: boolean; filePath: string | null }>
+}
+
+interface MenuAPI {
+  onNewFile: (callback: () => void) => void
+  onNewFolder: (callback: () => void) => void
+  onOpenFile: (callback: (event: any, path: string) => void) => void
+  onOpenDirectory: (callback: (event: any, path: string) => void) => void
+  onSave: (callback: () => void) => void
+  onSaveAs: (callback: () => void) => void
+  onUndo: (callback: () => void) => void
+  onAbout: (callback: () => void) => void
 }
 
 interface HistoryAPI {
@@ -39,12 +52,14 @@ interface HistoryAPI {
   getHistory: () => Promise<HistoryEntry[]>
   canUndo: () => Promise<boolean>
   clear: () => Promise<OperationResult>
+  recordOperation: (operation: string, params: Record<string, unknown>, rollbackInfo?: any) => Promise<string>
 }
 
 interface ConfigAPI {
   load: () => Promise<OperationResult<AppConfig>>
   get: () => Promise<AppConfig>
   update: (key: string, value: unknown) => Promise<OperationResult>
+  setConfig: (config: Partial<AppConfig>) => Promise<OperationResult>
   addFavorite: (path: string) => Promise<OperationResult>
   removeFavorite: (path: string) => Promise<OperationResult>
 }
@@ -74,6 +89,7 @@ interface ElectronAPI {
   config: ConfigAPI
   version: VersionAPI
   debug: DebugAPI
+  menu: MenuAPI
 }
 
 declare global {

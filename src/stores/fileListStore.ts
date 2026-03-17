@@ -387,7 +387,7 @@ export const useFileListStore = create<FileListState>((set, get) => ({
     const { selectedFiles } = get()
     const files = Array.from(selectedFiles)
     log.logAction({
-      actionType: 'copy',
+      actionType: 'execute',
       message: '复制文件到剪贴板',
       data: { count: files.length },
     })
@@ -401,7 +401,7 @@ export const useFileListStore = create<FileListState>((set, get) => ({
     const { selectedFiles } = get()
     const files = Array.from(selectedFiles)
     log.logAction({
-      actionType: 'cut',
+      actionType: 'execute',
       message: '剪切文件到剪贴板',
       data: { count: files.length },
     })
@@ -419,7 +419,7 @@ export const useFileListStore = create<FileListState>((set, get) => ({
     }
 
     log.logAction({
-      actionType: 'paste',
+      actionType: 'execute',
       message: `${clipboardOperation === 'copy' ? '复制' : '移动'}文件`,
       data: { count: clipboardFiles.length, destination: currentPath },
     })
@@ -500,7 +500,7 @@ export const useFileListStore = create<FileListState>((set, get) => ({
     }
 
     log.logAction({
-      actionType: 'paste',
+      actionType: 'execute',
       message: '粘贴操作完成',
       data: { successCount, failCount },
     })

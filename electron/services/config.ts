@@ -19,7 +19,8 @@ export class ConfigService {
 
       if (exists) {
         const data = await fs.readFile(this.configPath, 'utf-8')
-        this.config = { ...DEFAULT_CONFIG, ...JSON.parse(data) }
+        const parsedData = JSON.parse(data)
+        this.config = { ...DEFAULT_CONFIG, ...parsedData }
       } else {
         await this.save()
       }
@@ -38,12 +39,24 @@ export class ConfigService {
     try {
       const configDir = path.dirname(this.configPath)
       await fs.mkdir(configDir, { recursive: true })
+      
+      // 尝试写入配置文件
       await fs.writeFile(this.configPath, JSON.stringify(this.config, null, 2), 'utf-8')
       return { success: true }
     } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+      // 尝试使用备用路径
+      try {
+        const alternativePath = path.join(app.getPath('temp'), 'batch-rename-config.json')
+        await fs.writeFile(alternativePath, JSON.stringify(this.config, null, 2), 'utf-8')
+        return { 
+          success: true, 
+          error: '使用备用路径保存配置成功' 
+        }
+      } catch (alternativeError) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        }
       }
     }
   }
@@ -58,8 +71,16 @@ export class ConfigService {
   }
 
   async setConfig(newConfig: Partial<AppConfig>): Promise<OperationResult> {
-    this.config = { ...this.config, ...newConfig }
-    return this.save()
+    try {
+      this.config = { ...this.config, ...newConfig }
+      const result = await this.save()
+      return result
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      }
+    }
   }
 
   private async configExists(): Promise<boolean> {
