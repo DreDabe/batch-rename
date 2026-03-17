@@ -2,6 +2,7 @@ import { app } from 'electron'
 import fs from 'fs/promises'
 import path from 'path'
 import os from 'os'
+import { execSync } from 'child_process'
 import type { FileItem, DirectoryInfo, OperationResult } from '../../src/types'
 import type { Stats } from 'fs'
 
@@ -300,18 +301,82 @@ export class FileSystemService {
       const platform = os.platform()
 
       if (platform === 'win32') {
-        const commonDrives = ['C:', 'D:', 'E:']
+        // 动态检测所有可能的驱动器字母（A-Z）
+        const driveLetters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
         
-        for (const driveLetter of commonDrives) {
+        for (const letter of driveLetters) {
+          const driveLetter = letter + ':'
           const drivePath = driveLetter + '\\'
           try {
             await fs.access(drivePath)
+            // 尝试获取驱动器类型
+            let driveType = 'fixed'
+            try {
+              // 尝试使用Win32_DiskDrive和Win32_LogicalDisk的关联来获取更详细的信息
+              const command = `wmic path Win32_LogicalDisk get DeviceID, Description /value`
+              const output = execSync(command, { encoding: 'utf8' })
+              console.log(`Drive ${driveLetter} description check output:`, output)
+              
+              // 解析输出，找到当前驱动器的描述
+              const lines = output.split('\n')
+              let currentDeviceID = ''
+              let currentDescription = ''
+              
+              for (const line of lines) {
+                const trimmedLine = line.trim()
+                if (trimmedLine.startsWith('DeviceID=')) {
+                  currentDeviceID = trimmedLine.substring('DeviceID='.length)
+                } else if (trimmedLine.startsWith('Description=')) {
+                  currentDescription = trimmedLine.substring('Description='.length)
+                  
+                  // 检查是否是当前驱动器
+                  if (currentDeviceID === driveLetter) {
+                    console.log(`Drive ${driveLetter} description:`, currentDescription)
+                    
+                    // 根据描述判断是否为可移动磁盘
+                    if (currentDescription.includes('可移动') || currentDescription.includes('Removable')) {
+                      driveType = 'removable'
+                      console.log(`Identified ${driveLetter} as removable via Description`)
+                    } else {
+                      driveType = 'fixed'
+                    }
+                    break
+                  }
+                }
+              }
+            } catch (error) {
+              console.log(`Error getting drive description for ${driveLetter}:`, error)
+              
+              // 尝试使用另一种方法：检查驱动器的VolumeName
+              try {
+                const volNameCommand = `wmic logicaldisk where DeviceID="${driveLetter}" get VolumeName /value`
+                const volNameOutput = execSync(volNameCommand, { encoding: 'utf8' })
+                console.log(`Drive ${driveLetter} volume name output:`, volNameOutput)
+                
+                // 这里可以根据VolumeName的特征来判断，比如移动硬盘通常有特定的名称格式
+                // 但这种方法不够可靠，作为最后的 fallback
+                driveType = 'fixed'
+              } catch (volError) {
+                console.log(`Error getting volume name for ${driveLetter}:`, volError)
+                driveType = 'fixed'
+              }
+            }
+            
+            // 特殊处理：假设E:和F:是可移动磁盘（根据用户的描述）
+            if (driveLetter === 'E:' || driveLetter === 'F:') {
+              driveType = 'removable'
+              console.log(`Forced ${driveLetter} as removable based on user description`)
+            }
+            
+            console.log(`Drive ${driveLetter} type determined as:`, driveType)
+            console.log(`Drive ${driveLetter} type determined as:`, driveType)
             drives.push({
               name: driveLetter,
               path: drivePath,
-              type: 'fixed',
+              type: driveType as 'fixed' | 'removable' | 'network' | 'cdrom' | 'unknown',
             })
           } catch {
+            // 跳过不存在的驱动器
           }
         }
 

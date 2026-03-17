@@ -191,6 +191,16 @@ export function TreePanel() {
   useEffect(() => {
     debugLog('TreePanel mounted, 初始化目录树')
     initializeTree()
+
+    // 定期刷新驱动器列表，检测新插入的存储设备
+    const refreshInterval = setInterval(() => {
+      debugLog('定期刷新驱动器列表')
+      initializeTree()
+    }, 30000) // 每30秒刷新一次
+
+    return () => {
+      clearInterval(refreshInterval)
+    }
   }, [initializeTree])
 
   useEffect(() => {

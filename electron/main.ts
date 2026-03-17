@@ -22,15 +22,6 @@ function createMenu() {
       label: '文件',
       submenu: [
         {
-          label: '新建文件',
-          accelerator: 'Ctrl+N',
-          click: (_, focusedWindow) => {
-            if (focusedWindow) {
-              focusedWindow.webContents.send('menu:new-file')
-            }
-          }
-        },
-        {
           label: '新建文件夹',
           accelerator: 'Ctrl+Shift+N',
           click: (_, focusedWindow) => {
@@ -41,21 +32,6 @@ function createMenu() {
         },
         {
           type: 'separator'
-        },
-        {
-          label: '打开文件',
-          accelerator: 'Ctrl+O',
-          click: async (_, focusedWindow) => {
-            if (focusedWindow) {
-              const result = await dialog.showOpenDialog(focusedWindow, {
-                properties: ['openFile'],
-                title: '选择文件'
-              })
-              if (!result.canceled && result.filePaths.length > 0) {
-                focusedWindow.webContents.send('menu:open-file', result.filePaths[0])
-              }
-            }
-          }
         },
         {
           label: '打开目录',
