@@ -24,12 +24,14 @@ interface RuleState {
   previews: RenamePreview[]
   isExecuting: boolean
   error: string | null
+  shouldSelectAll: boolean
 
-  setRuleConfig: (config: Partial<RuleConfig>) => void
+  setRuleConfig: (config: Partial<RuleConfig>, shouldSelectAll?: boolean) => void
   generatePreviews: (files: FileItem[]) => void
   executeRename: () => Promise<{ success: number; failed: number }>
   clearPreviews: () => void
   getPatternString: () => string
+  resetShouldSelectAll: () => void
 }
 
 const DEFAULT_RULE_CONFIG: RuleConfig = {
@@ -49,8 +51,9 @@ export const useRuleStore = create<RuleState>((set, get) => ({
   previews: [],
   isExecuting: false,
   error: null,
+  shouldSelectAll: false,
 
-  setRuleConfig: (config) => {
+  setRuleConfig: (config, shouldSelectAll = false) => {
     const prevConfig = get().ruleConfig
     log.logAction({
       actionType: 'input',
@@ -61,7 +64,12 @@ export const useRuleStore = create<RuleState>((set, get) => ({
     })
     set((state) => ({
       ruleConfig: { ...state.ruleConfig, ...config },
+      shouldSelectAll,
     }))
+  },
+
+  resetShouldSelectAll: () => {
+    set({ shouldSelectAll: false })
   },
 
   generatePreviews: async (files) => {

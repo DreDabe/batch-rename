@@ -130,9 +130,9 @@ export function TopMenuBar() {
           const { selectFile } = useFileListStore.getState()
           selectFile(newFolderPath, newFolderIndex, false, false)
           
-          // 设置规则面板中的自定义规则为文件夹名称
+          // 设置规则面板中的自定义规则为文件夹名称，并标记需要全选文本
           const { setRuleConfig } = useRuleStore.getState()
-          setRuleConfig({ pattern: folderName })
+          setRuleConfig({ pattern: folderName }, true)
         }
       }
     } else {

@@ -256,7 +256,7 @@ function ExtensionInput() {
 }
 
 function CustomRuleInput() {
-  const { ruleConfig, setRuleConfig } = useRuleStore()
+  const { ruleConfig, setRuleConfig, shouldSelectAll, resetShouldSelectAll } = useRuleStore()
   const { settings } = useSettingsStore()
   const { theme } = settings
   const selectedFiles = useFileListStore((state) => state.getSelectedFiles())
@@ -270,15 +270,17 @@ function CustomRuleInput() {
     }
   }, [settings.customRule, ruleConfig.pattern, selectedFiles.length, setRuleConfig])
   
-  // 当规则变化时，聚焦并全选文本
+  // 当规则变化且需要全选时，聚焦并全选文本
   useEffect(() => {
-    if (ruleConfig.pattern && textareaRef.current) {
+    if (shouldSelectAll && ruleConfig.pattern && textareaRef.current) {
       setTimeout(() => {
         textareaRef.current?.focus()
         textareaRef.current?.select()
+        // 重置shouldSelectAll状态，避免下次操作再次全选
+        resetShouldSelectAll()
       }, 10)
     }
-  }, [ruleConfig.pattern])
+  }, [ruleConfig.pattern, shouldSelectAll, resetShouldSelectAll])
 
   const handlePatternChange = useCallback((value: string) => {
     logInput('自定义规则', value.length > 30 ? `${value.substring(0, 30)}...` : value)

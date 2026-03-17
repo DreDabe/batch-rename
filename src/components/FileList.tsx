@@ -396,15 +396,6 @@ export function FileList() {
     )
   }
 
-  if (files.length === 0) {
-    return (
-      <div className={`flex flex-col items-center justify-center h-full ${theme === 'dark' ? 'text-gray-400 bg-gray-900' : 'text-gray-400 bg-white'}`}>
-        <span className="text-4xl mb-2">📭</span>
-        <span className="text-sm">目录为空</span>
-      </div>
-    )
-  }
-
   return (
     <div className={`h-full flex flex-col min-h-0 ${theme === 'dark' ? 'bg-gray-900' : 'bg-white'}`} style={{ backgroundColor: theme === 'dark' ? '#111827' : '#ffffff' }}>
       <div className={`flex items-center gap-1 px-3 py-2 border-b flex-shrink-0 ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'}`}>
@@ -460,28 +451,37 @@ export function FileList() {
           {currentPath || '请选择目录'}
         </div>
       </div>
-      <div className="flex-1 min-h-0 overflow-hidden" style={{ backgroundColor: theme === 'dark' ? '#111827' : '#ffffff' }}>
-        <VirtualList
-          items={files}
-          itemHeight={ITEM_HEIGHT}
-          renderItem={(file, index) => (
-            <FileListItem
-              key={file.path}
-              file={file}
-              index={index}
-              isSelected={selectedFiles.has(file.path)}
-              onSelect={selectFile}
-              onDoubleClick={handleDoubleClick}
-              onDragStart={handleDragStart}
-              onDragEnd={handleDragEnd}
-              onDragOver={handleDragOver}
-              onDrop={handleDrop}
-              theme={theme}
-            />
-          )}
-          theme={theme}
-        />
-      </div>
+      {files.length === 0 ? (
+        <div className="flex-1 flex items-center justify-center" style={{ backgroundColor: theme === 'dark' ? '#111827' : '#ffffff' }}>
+          <div className={`flex flex-col items-center justify-center ${theme === 'dark' ? 'text-gray-400' : 'text-gray-400'}`}>
+            <span className="text-4xl mb-2">📭</span>
+            <span className="text-sm">目录为空</span>
+          </div>
+        </div>
+      ) : (
+        <div className="flex-1 min-h-0 overflow-hidden" style={{ backgroundColor: theme === 'dark' ? '#111827' : '#ffffff' }}>
+          <VirtualList
+            items={files}
+            itemHeight={ITEM_HEIGHT}
+            renderItem={(file, index) => (
+              <FileListItem
+                key={file.path}
+                file={file}
+                index={index}
+                isSelected={selectedFiles.has(file.path)}
+                onSelect={selectFile}
+                onDoubleClick={handleDoubleClick}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+                onDragOver={handleDragOver}
+                onDrop={handleDrop}
+                theme={theme}
+              />
+            )}
+            theme={theme}
+          />
+        </div>
+      )}
       <div className={`px-3 py-2 text-xs border-t flex-shrink-0 ${theme === 'dark' ? 'bg-gray-800 border-gray-700 text-gray-400' : 'bg-gray-50 border-gray-200 text-gray-500'}`}>
         共 {files.length} 项，已选择 {selectedFiles.size} 项
       </div>

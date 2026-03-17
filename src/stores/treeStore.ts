@@ -25,6 +25,7 @@ interface TreeState {
   error: string | null
   panelWidth: number
   isPanelCollapsed: boolean
+  driveCount: number
 
   initializeTree: () => Promise<void>
   loadNodeChildren: (nodeId: string, nodePath: string) => Promise<void>
@@ -59,10 +60,9 @@ export const useTreeStore = create<TreeState>((set, get) => ({
   error: null,
   panelWidth: 200,
   isPanelCollapsed: false,
+  driveCount: 0,
 
   initializeTree: async () => {
-    set({ isLoading: true, error: null })
-
     try {
       const result = await window.electronAPI.fs.getDrives()
       
@@ -71,30 +71,48 @@ export const useTreeStore = create<TreeState>((set, get) => ({
       }
 
       const drives: DriveInfo[] = result.data
+      const newDriveCount = drives.length
+      const currentDriveCount = get().driveCount
 
-      const rootNode: TreeNode = {
-        id: 'root',
-        name: '此电脑',
-        path: '',
-        type: 'root',
-        isExpanded: true,
-        isLoading: false,
-        children: drives.map((drive: DriveInfo) => ({
-          id: drive.path,
-          name: drive.name,
-          path: drive.path,
-          type: 'drive' as const,
-          isExpanded: false,
+      // 只有当驱动器数量有变化时才更新树状目录
+      if (newDriveCount !== currentDriveCount) {
+        set({ isLoading: true, error: null })
+
+        const rootNode: TreeNode = {
+          id: 'root',
+          name: '此电脑',
+          path: '',
+          type: 'root',
+          isExpanded: true,
           isLoading: false,
-          children: null,
+          children: drives.map((drive: DriveInfo) => ({
+            id: drive.path,
+            name: drive.name,
+            path: drive.path,
+            type: 'drive' as const,
+            isExpanded: false,
+            isLoading: false,
+            children: null,
+            hasChildren: true,
+            icon: getDriveIcon(drive.type),
+          })),
           hasChildren: true,
-          icon: getDriveIcon(drive.type),
-        })),
-        hasChildren: true,
-        icon: '💻',
-      }
+          icon: '💻',
+        }
 
-      set({ rootNode, isLoading: false })
+        set({ rootNode, isLoading: false, driveCount: newDriveCount })
+
+        // 更新后，获取文件列表的当前路径，并展开到该路径
+        try {
+          const fileListStore = await import('../stores/fileListStore')
+          const currentPath = fileListStore.useFileListStore.getState().currentPath
+          if (currentPath) {
+            await get().expandToPath(currentPath)
+          }
+        } catch (importError) {
+          // 忽略导入错误，可能是因为循环依赖
+        }
+      }
     } catch (error) {
       const errMsg = error instanceof Error ? error.message : '未知错误'
       set({ 
